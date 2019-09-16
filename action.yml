@@ -1,13 +1,29 @@
-name: 'Wait'
-description: 'Wait a designated number of milliseconds'
+name: 'Licensed CI'
+description: 'Ensure cached github/licensed license data is valid and up to date'
 inputs:
-  milliseconds:  # id of input
-    description: 'number of milliseconds to wait'
+  command:
+    description: 'Licensed command to run'
+    required: false
+    default: 'licensed'
+  github_token:
+    description: 'Access token to push license updates to GitHub'
     required: true
-    default: '1000'
-outputs:
-  time: # output will be available to future steps 
-    description: 'The message to output'
+  config_file:
+    description: 'Path to licensed configuration file'
+    required: false
+    default: '.licensed.yml'
+  user_name:
+    description: 'Name to use when pushing file changes'
+    required: false
+    default: 'github/licensed'
+  user_email:
+    description: 'Email to use when pushing file changes'
+    required: false
+    default: 'github-licensed@users.noreply.github.com'
+  commit_message:
+    description: 'Message to use when committing file changes'
+    required: false
+    default: 'Auto-update license files'
 runs:
   using: 'node12'
   main: 'index.js'
