@@ -15,11 +15,11 @@ inputs:
   user_name:
     description: 'Name to use when pushing file changes'
     required: false
-    default: 'github/licensed'
+    default: 'licensed-ci'
   user_email:
     description: 'Email to use when pushing file changes'
     required: false
-    default: 'github-licensed@users.noreply.github.com'
+    default: 'licensed-ci@users.noreply.github.com'
   commit_message:
     description: 'Message to use when committing file changes'
     required: false
