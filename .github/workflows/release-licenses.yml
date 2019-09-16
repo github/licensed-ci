@@ -1,0 +1,19 @@
+name: "Cache release dependency metadata"
+on:
+  push:
+    branches:
+      - 'releases/*'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+
+    - run: npm install --production
+    - uses: jonabc/setup-licensed@v1
+      with:
+        version: '2.x'
+    - uses: ./
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
