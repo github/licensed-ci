@@ -24,6 +24,9 @@ inputs:
     description: 'Message to use when committing file changes'
     required: false
     default: 'Auto-update license files'
+branding:
+  icon: check-circle
+  color: green
 runs:
   using: 'node12'
   main: 'index.js'
