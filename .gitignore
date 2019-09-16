@@ -1,3 +1,6 @@
+# used for all-branch testing
+.licenses.ignored
+
 # Logs
 logs
 *.log

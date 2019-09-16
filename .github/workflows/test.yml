@@ -1,8 +1,5 @@
-name: "Run JavaScript Action"
-on:
-  push:
-    branches:    
-      - 'releases/*'   # only run in release distribution branches
+name: "Test"
+on: push
 
 jobs:
   test:
@@ -10,8 +7,11 @@ jobs:
     steps:
     - uses: actions/checkout@v1
 
-    - run: npm ci
-    - run: npm test
-    - uses: actions/javascript-action@releases/v1
-      with: 
-        milliseconds: 1000
+    - run: npm install --production
+    - uses: jonabc/setup-licensed@v1
+      with:
+        version: '2.x'
+    - uses: ./
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        config_file: .licensed.test.yml # caches files to an ignored folder path
