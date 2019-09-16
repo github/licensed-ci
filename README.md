@@ -1,108 +1,53 @@
-# Create a JavaScript Action
+# licensed-ci
 
-Use this template to bootstrap the creation of a JavaScript action.:rocket:
+Runs a [github/licensed](https://github.com/github/licensed) CI workflow.
+1. Run `licensed cache` to update locally cached metadata.
+1. Commit any changes back to the branch
+1. Run `licensed status` to check that license data is available, known, up to date and valid for all dependencies
+   - Status check failures will cause the step to fail, allowing examination and further updates to the code (if needed).
 
-This template includes tests, linting, a validation workflow, publishing, and versioning guidance.  
+### Configuration
 
-If you are new, there's also a simpler introduction.  See the [Hello World JavaScript Action](https://github.com/actions/hello-world-javascript-action)
+`github_token` - Required.  The access token used to push changes to the branch on GitHub.
+`command` - Optional, default: `licensed`. The command used to call licensed.
+`config_file` - Optional, default: `.licensed.yml`.  The configuration file path within the workspace.
+`user_name` - Optional, default: `licensed-ci`.  The name used when committing any cached file changes.
+`user_email` - Optional, default: `licensed-ci@users.noreply.github.com`.  The email address used when committing any cached file changes.
+`commit_message` - Optional, default: `Auto-update license files`.  Message to use when committing any cached file changes.
 
-## Create an action from this template
+### Usage
 
-Click the `Use this Template` and provide the new repo details for your action
-
-## Code in Master
-
-Install the dependencies  
-```bash
-$ npm install
-```
-
-Run the tests :heavy_check_mark:  
-```bash
-$ npm test
-
- PASS  ./index.test.js
-  ✓ throws invalid number (3ms)
-  ✓ wait 500 ms (504ms)
-  ✓ test runs (95ms)
-
-...
-```
-
-## Change action.yml
-
-The action.yml contains defines the inputs and output for your action.
-
-Update the action.yml with your name, description, inputs and outputs for your action.
-
-See the [documentation](https://help.github.com/en/articles/metadata-syntax-for-github-actions)
-
-## Change the Code
-
-Most toolkit and CI/CD operations involve async operations so the action is run in an async function.
-
-```javascript
-const core = require('@actions/core');
-...
-
-async function run() {
-  try { 
-      ...
-  } 
-  catch (error) {
-    core.setFailed(error.message);
-  }
-}
-
-run()
-```
-
-See the [toolkit documentation](https://github.com/actions/toolkit/blob/master/README.md#packages) for the various packages.
-
-## Publish to a distribution branch
-
-Actions are run from GitHub repos.  We will create a releases branch and only checkin production modules (core in this case). 
-
-Comment out node_modules in .gitignore and create a releases/v1 branch
-```bash
-# Dependency directories
-# node_modules/
-```
-
-```bash
-$ git checkout -b releases/v1
-$ git commit -a -m "prod dependencies"
-```
-
-```bash
-$ npm prune --production
-$ git add node_modules
-$ git commit -a -m "prod dependencies"
-$ git push origin releases/v1
-```
-
-Your action is now published! :rocket: 
-
-See the [versioning documentation](https://github.com/actions/toolkit/blob/master/docs/action-versioning.md)
-
-## Validate
-
-You can now validate the action by referencing the releases/v1 branch
-
+Basic usage with a licensed release package using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)
 ```yaml
-uses: actions/javascript-action@releases/v1
-with:
-  milliseconds: 1000
+steps:
+- uses: actions/checkout@master
+- uses: jonabc/setup-licensed@v1
+  with:
+    version: 2.x
+- run: npm install # install your projects dependencies in local environment
+- uses: jonabc/licensed-ci@v1
+  with:
+    github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-See the [actions tab](https://github.com/actions/javascript-action/actions) for runs of this action! :rocket:
-
-## Usage:
-
-After testing you can [create a v1 tag](https://github.com/actions/toolkit/blob/master/docs/action-versioning.md) to reference the stable and tested action
-
+Basic usage with bundled licensed gem
 ```yaml
-uses: actions/javascript-action@v1
-with:
-  milliseconds: 1000
+steps:
+- uses: actions/checkout@master
+- uses: actions/setup-ruby@v1
+  with:
+    ruby-version: 2.6.x
+- run: bundle install
+- uses: jonabc/licensed-ci@v1
+  with:
+    github_token: ${{ secrets.GITHUB_TOKEN }}
+    command: 'bundle exec licensed' # or bin/licensed when using binstubs
 ```
+
+# License
+
+This project is released under the [MIT License](LICENSE)
+
+# Contributions
+
+Contributions are welcome!
