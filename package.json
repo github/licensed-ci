@@ -1,32 +1,32 @@
 {
-  "name": "javascript-action",
+  "name": "licensed-ci",
   "version": "1.0.0",
-  "description": "JavaScript Action Template",
+  "description": "GitHub Actions CI workflow for github/licensed",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint index.js",
-    "test": "eslint index.js && jest"
+    "lint": "eslint index.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/actions/javascript-action.git"
+    "url": "git+https://github.com/jonabc/licensed-ci.git"
   },
   "keywords": [
     "GitHub",
-    "Actions",
-    "JavaScript"
+    "Licensed"
   ],
-  "author": "GitHub",
+  "author": "Jon Ruskin",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/actions/javascript-action/issues"
+    "url": "https://github.com/jonabc/licensed-ci/issues"
   },
-  "homepage": "https://github.com/actions/javascript-action#readme",
+  "homepage": "https://github.com/jonabc/licensed-ci#readme",
   "dependencies": {
-    "@actions/core": "^1.1.0"
+    "@actions/core": "^1.1.0",
+    "@actions/exec": "^1.0.1",
+    "@actions/io": "^1.0.1"
   },
   "devDependencies": {
-    "eslint": "^6.3.0",
-    "jest": "^24.9.0"
+    "acorn": "^6.3.0",
+    "eslint": "^6.3.0"
   }
 }
