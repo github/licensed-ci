@@ -8,12 +8,12 @@ Runs a [github/licensed](https://github.com/github/licensed) CI workflow.
 
 ### Configuration
 
-`github_token` - Required.  The access token used to push changes to the branch on GitHub.
-`command` - Optional, default: `licensed`. The command used to call licensed.
-`config_file` - Optional, default: `.licensed.yml`.  The configuration file path within the workspace.
-`user_name` - Optional, default: `licensed-ci`.  The name used when committing any cached file changes.
-`user_email` - Optional, default: `licensed-ci@users.noreply.github.com`.  The email address used when committing any cached file changes.
-`commit_message` - Optional, default: `Auto-update license files`.  Message to use when committing any cached file changes.
+- `github_token` - Required.  The access token used to push changes to the branch on GitHub.
+- `command` - Optional, default: `licensed`. The command used to call licensed.
+- `config_file` - Optional, default: `.licensed.yml`.  The configuration file path within the workspace.
+- `user_name` - Optional, default: `licensed-ci`.  The name used when committing any cached file changes.
+- `user_email` - Optional, default: `licensed-ci@users.noreply.github.com`.  The email address used when committing any cached file changes.
+- `commit_message` - Optional, default: `Auto-update license files`.  Message to use when committing any cached file changes.
 
 ### Usage
 
