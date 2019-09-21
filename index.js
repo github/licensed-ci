@@ -1,5 +1,5 @@
 const core = require('@actions/core');
-const { exec } = require('@actions/exec');
+const exec = require('@actions/exec');
 const fs = require('fs').promises;
 const io = require('@actions/io');
 
@@ -22,18 +22,18 @@ async function run() {
     }
     branch = branch.replace('refs/heads/', '');
 
-    await exec('git', ['checkout', branch]);
-    await exec(command, ['cache', '-c', configFilePath]);
-    await exec('git', ['add', '.']);
+    await exec.exec('git', ['checkout', branch]);
+    await exec.exec(command, ['cache', '-c', configFilePath]);
+    await exec.exec('git', ['add', '.']);
 
-    const exitCode = await exec('git', ['diff-index', '--quiet', 'HEAD'], { ignoreReturnCode: true });
+    const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD'], { ignoreReturnCode: true });
     if (exitCode > 0) {
-      await exec('git', ['remote', 'add', 'licensed-ci-origin', `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`]);
-      await exec('git', ['-c', `user.name=${userName}`, '-c', `user.email=${userEmail}`, 'commit', '-m', commitMessage]);
-      await exec('git', ['push', 'licensed-ci-origin', branch]);
+      await exec.exec('git', ['remote', 'add', 'licensed-ci-origin', `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`]);
+      await exec.exec('git', ['-c', `user.name=${userName}`, '-c', `user.email=${userEmail}`, 'commit', '-m', commitMessage]);
+      await exec.exec('git', ['push', 'licensed-ci-origin', branch]);
     }
 
-    await exec(command, ['status', '-c', configFilePath]);
+    await exec.exec(command, ['status', '-c', configFilePath]);
   }
   catch (error) {
     core.setFailed(error.message);
