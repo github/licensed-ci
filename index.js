@@ -17,7 +17,9 @@ async function run() {
     await fs.access(configFilePath); // check that config file exists
 
     let branch = process.env.GITHUB_REF;
-    if (!branch.startsWith('refs/heads')) {
+    if (!branch) {
+      throw new Error('Current ref not available');
+    } else if (!branch.startsWith('refs/heads')) {
       throw new Error(`${branch} does not reference a branch`);
     }
     branch = branch.replace('refs/heads/', '');

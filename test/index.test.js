@@ -101,6 +101,14 @@ describe('licensed-ci', () => {
     expect(outString).toMatch('Input required and not supplied: command');
   });
 
+  it('raises an error when ref is not found', async () => {
+    delete options.env.GITHUB_REF;
+
+    const exitCode = await exec('node', nodeArgs, options);
+    expect(exitCode).toEqual(core.ExitCode.Failure);
+    expect(outString).toMatch('Current ref not available');
+  });
+
   it('raises an error when ref is not a branch', async () => {
     options.env.GITHUB_REF = '/refs/tags/v1';
 
