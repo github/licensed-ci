@@ -16,5 +16,4 @@ reviewed:
   - lodash.get
   - lodash.set
   - lodash.uniq
-  - universal-agent-2.1.0
-  - universal-agent-4.0.0
+  - universal-user-agent
