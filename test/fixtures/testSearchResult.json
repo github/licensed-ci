@@ -1,0 +1,25 @@
+{
+  "total_count": 1,
+  "incomplete_results": false,
+  "items": [
+    {
+      "url": "https://api.github.com/repos/jonabc/repo/issues/1",
+      "repository_url": "https://api.github.com/repos/jonabc/repo",
+      "labels_url": "https://api.github.com/repos/jonabc/repo/issues/1/labels{/name}",
+      "comments_url": "https://api.github.com/repos/jonabc/repo/issues/1/comments",
+      "events_url": "https://api.github.com/repos/jonabc/repo/issues/1/events",
+      "html_url": "https://github.com/jonabc/repo/pull/1",
+      "number": 1,
+      "comments": 0,
+      "created_at": "2019-09-14T02:28:45Z",
+      "updated_at": "2019-09-14T02:28:54Z",
+      "closed_at": "2019-09-14T02:28:51Z",
+      "pull_request": {
+        "url": "https://api.github.com/repos/jonabc/setup-licensed/pulls/1",
+        "html_url": "https://github.com/jonabc/setup-licensed/pull/1",
+        "diff_url": "https://github.com/jonabc/setup-licensed/pull/1.diff",
+        "patch_url": "https://github.com/jonabc/setup-licensed/pull/1.patch"
+      }
+    }
+  ]
+}
