@@ -4,7 +4,7 @@ version: 1.0.0
 type: npm
 summary: Smallest/simplest possible means of using btoa with both Node and browserify
 homepage: https://github.com/hughsk/btoa-lite
-license: other
+license: mit
 licenses:
 - sources: LICENSE.md
   text: |
