@@ -24,7 +24,7 @@ describe('licensed-ci', () => {
   const userName = 'user';
   const userEmail = 'user@example.com';
   const commitMessage = 'commit message';
-  const command = 'command';
+  const command = 'licensed';
   const configFile = path.normalize(path.join(__dirname, '..', '.licensed.test.yml'));
 
   const branch = 'branch';
