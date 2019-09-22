@@ -2,7 +2,7 @@ name: "Test"
 on: push
 
 jobs:
-  test:
+  npm_test:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v1
@@ -12,7 +12,16 @@ jobs:
       with:
         version: '2.x'
     - run: npm run test
+
+  licensed_ci:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+
+    - run: npm install --production
+    - uses: jonabc/setup-licensed@v1
+      with:
+        version: '2.x'
     - uses: ./
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        config_file: .licensed.test.yml # caches files to an ignored folder path

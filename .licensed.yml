@@ -6,3 +6,14 @@ allowed:
 - mit
 - cc0-1.0
 - unlicense
+
+cache_path: .licenses.ignored
+
+reviewed:
+  npm:
+  - atob-lite
+  - btoa-lite
+  - lodash.get
+  - lodash.set
+  - lodash.uniq
+  - universal-user-agent
