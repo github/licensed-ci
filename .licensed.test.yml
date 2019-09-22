@@ -8,3 +8,13 @@ allowed:
 - unlicense
 
 cache_path: .licenses.ignored
+
+reviewed:
+  npm:
+  - atob-lite
+  - btoa-lite
+  - lodash.get
+  - lodash.set
+  - lodash.uniq
+  - universal-agent-2.1.0
+  - universal-agent-4.0.0
