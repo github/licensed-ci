@@ -25,4 +25,3 @@ jobs:
     - uses: ./
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        config_file: .licensed.test.yml # caches files to an ignored folder path
