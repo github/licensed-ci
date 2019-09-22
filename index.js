@@ -2,6 +2,34 @@ const core = require('@actions/core');
 const exec = require('@actions/exec');
 const fs = require('fs').promises;
 const io = require('@actions/io');
+const github = require('@actions/github');
+
+async function createCommentOnPullRequest(token, branch, comment) {
+  const octokit = new github.GitHub(token);
+
+  // first try to find a pull request for the branch
+  await octokit.search.issuesAndPullRequests({
+    q: `is:pr repo:${process.env.GITHUB_REPOSITORY} head:${branch}`
+  }).then(({ data }) => {
+    if (data.total_count != 1) {
+      console.log(`Pull request for branch ${branch} not found`);
+      return null;
+    }
+
+    // then add a comment if a pull request exists
+    const issue = data.items[0];
+    console.log(`Found pull request ${issue.pull_request.html_url}`);
+    console.log(`Add comment ${comment}`);
+
+    const [owner, repo] = process.env.GITHUB_REPOSITORY.split('/');
+    return octokit.issues.createComment({
+      owner,
+      repo,
+      issue_number: issue.number,
+      body: comment,
+    });
+  });
+}
 
 async function run() {
   try {
@@ -33,6 +61,11 @@ async function run() {
       await exec.exec('git', ['remote', 'add', 'licensed-ci-origin', `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`]);
       await exec.exec('git', ['-c', `user.name=${userName}`, '-c', `user.email=${userEmail}`, 'commit', '-m', commitMessage]);
       await exec.exec('git', ['push', 'licensed-ci-origin', branch]);
+
+      const prComment = core.getInput('pr_comment');
+      if (prComment) {
+        createCommentOnPullRequest(token, branch, prComment);
+      }
     }
 
     await exec.exec(command, ['status', '-c', configFilePath]);
