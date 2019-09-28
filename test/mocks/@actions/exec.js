@@ -29,7 +29,7 @@ sinon.stub(exec, 'exec').callsFake(async (command, args, options) => {
     }
 
     const stderr = getOutputString(mock.stderr);
-    if (mock.stderr) {
+    if (stderr) {
       // echo the mocked stderr using the passed in options
       await actionExec(`echo ${stderr}`, [], options);
     }
