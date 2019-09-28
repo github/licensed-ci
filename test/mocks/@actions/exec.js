@@ -1,4 +1,5 @@
 const exec = require('@actions/exec');
+const os = require('os');
 const sinon = require('sinon');
 
 const actionExec = exec.exec;
@@ -13,12 +14,16 @@ sinon.stub(exec, 'exec').callsFake(async (command, args, options) => {
   if (mock) {
     if (mock.stdout) {
       // echo the mocked stdout using the passed in options
-      await actionExec(`echo ${JSON.stringify(mock.stdout)}`, [], options);
+      // map mock.stdout to an array of JSON-escaped content joined by EOL
+      const output = Array.of(mock.stdout).flat().map(arg => JSON.stringify(arg)).join(os.EOL);
+      await actionExec(`echo ${output}`, [], options);
     }
 
     if (mock.stderr) {
       // echo the mocked stderr using the passed in options
-      await actionExec(`echo ${JSON.stringify(mock.stderr)} >&2`, [], options);
+      // map mock.stderr to an array of JSON-escaped content joined by EOL
+      const output = Array.of(mock.stderr).flat().map(arg => JSON.stringify(arg)).join(os.EOL);
+      await actionExec(`echo ${output}`, [], options);
     }
 
     if (mock.exitCode || mock.exitCode === 0) {
