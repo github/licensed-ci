@@ -60,14 +60,6 @@ describe('licensed-ci', () => {
     };
   });
 
-  it('raises an error when github_token is not given', async () => {
-    delete options.env.INPUT_GITHUB_TOKEN;
-
-    const exitCode = await exec('node', nodeArgs, options);
-    expect(exitCode).toEqual(core.ExitCode.Failure);
-    expect(outString).toMatch('Input required and not supplied: github_token');
-  });
-
   it('raises an error when commit_message is not given', async () => {
     delete options.env.INPUT_COMMIT_MESSAGE;
 
@@ -146,8 +138,8 @@ describe('licensed-ci', () => {
     it('adds and checks all files in the repository', async () => {
       const exitCode = await exec('node', nodeArgs, options);
       expect(exitCode).toEqual(core.ExitCode.Success);
-      expect(outString).toMatch('git add .');
-      expect(outString).not.toMatch('git diff-index --quiet HEAD --');
+      expect(outString).toMatch('git add -- .');
+      expect(outString).toMatch('git diff-index --quiet HEAD -- .');
     });
   });
 
@@ -162,8 +154,9 @@ describe('licensed-ci', () => {
 
     it('adds and checks licensed cache_paths', async () => {
       const exitCode = await exec('node', nodeArgs, options);
+      console.log(outString);
       expect(exitCode).toEqual(core.ExitCode.Success);
-      expect(outString).toMatch('git add project/licenses test/licenses');
+      expect(outString).toMatch('git add -- project/licenses test/licenses');
       expect(outString).toMatch('git diff-index --quiet HEAD -- project/licenses test/licenses');
     });
   });
@@ -197,6 +190,14 @@ describe('licensed-ci', () => {
         { command: 'git diff-index', exitCode: 1 },
         { command: '', exitCode: 0 }
       ]);
+    });
+
+    it('raises an error when github_token is not given', async () => {
+      delete options.env.INPUT_GITHUB_TOKEN;
+
+      const exitCode = await exec('node', nodeArgs, options);
+      expect(exitCode).toEqual(core.ExitCode.Failure);
+      expect(outString).toMatch('Input required and not supplied: github_token');
     });
 
     it('pushes changes to origin', async () => {

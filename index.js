@@ -45,28 +45,12 @@ async function getCachePaths(command, configFilePath) {
     return JSON.parse(output).apps.map(app => app.cache_path);
   }
 
-  return [];
-}
-
-function gitAddArgs(cachePaths) {
-  if (cachePaths.length == 0) {
-    return ['.'];
-  }
-
-  return cachePaths;
-}
-
-function gitDiffIndexArgs(cachePaths) {
-  if (cachePaths.length == 0) {
-    return [];
-  }
-
-  return ['--', ...cachePaths];
+  // if `licensed env` failed or there was no output, add updated files for the whole repo
+  return ['.'];
 }
 
 async function run() {
   try {
-    const token = core.getInput('github_token', { required: true });
     const commitMessage = core.getInput('commit_message', { required: true });
     const userName = core.getInput('user_name', { required: true });
     const userEmail = core.getInput('user_email', { required: true });
@@ -77,6 +61,7 @@ async function run() {
     const configFilePath = core.getInput('config_file', { required: true });
     await fs.access(configFilePath); // check that config file exists
 
+    // checkout the target branch
     let branch = process.env.GITHUB_REF;
     if (!branch) {
       throw new Error('Current ref not available');
@@ -84,26 +69,32 @@ async function run() {
       throw new Error(`${branch} does not reference a branch`);
     }
     branch = branch.replace('refs/heads/', '');
-
-    const cachePaths = await getCachePaths(command, configFilePath);
-
     await exec.exec('git', ['checkout', branch]);
+
+    // cache any metadata updates
     await exec.exec(command, ['cache', '-c', configFilePath]);
 
-    await exec.exec('git', ['add', ...gitAddArgs(cachePaths)]);
+    // stage any changes, checking only configured cache paths if possible
+    const cachePaths = await getCachePaths(command, configFilePath);
+    await exec.exec('git', ['add', '--', ...cachePaths]);
 
-    const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', ...gitDiffIndexArgs(cachePaths)], { ignoreReturnCode: true });
+    // check for any changes, checking only configured cache paths if possible
+    const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths], { ignoreReturnCode: true });
     if (exitCode > 0) {
+      // if files were changed, push them back up to origin using the passed in github token
+      const token = core.getInput('github_token', { required: true });
       await exec.exec('git', ['remote', 'add', 'licensed-ci-origin', `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`]);
       await exec.exec('git', ['-c', `user.name=${userName}`, '-c', `user.email=${userEmail}`, 'commit', '-m', commitMessage]);
       await exec.exec('git', ['push', 'licensed-ci-origin', branch]);
 
+      // if a PR comment was supplied, try to comment on an open pull request
       const prComment = core.getInput('pr_comment');
       if (prComment) {
         createCommentOnPullRequest(token, branch, prComment);
       }
     }
 
+    // check the status of current cached data
     await exec.exec(command, ['status', '-c', configFilePath]);
   }
   catch (error) {
