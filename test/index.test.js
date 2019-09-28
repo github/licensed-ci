@@ -56,7 +56,7 @@ describe('licensed-ci', () => {
       listeners: {
         stdout: data => outString += data.toString()
       },
-      outStream: new stream.Writable({ write: () => { } })
+      outStream: new stream.Writable({ write: () => {} })
     };
   });
 
@@ -154,7 +154,6 @@ describe('licensed-ci', () => {
 
     it('adds and checks licensed cache_paths', async () => {
       const exitCode = await exec('node', nodeArgs, options);
-      console.log(outString);
       expect(exitCode).toEqual(core.ExitCode.Success);
       expect(outString).toMatch('git add -- project/licenses test/licenses');
       expect(outString).toMatch('git diff-index --quiet HEAD -- project/licenses test/licenses');
