@@ -1,8 +1,8 @@
 const core = require('@actions/core');
 const exec = require('@actions/exec');
 const fs = require('fs').promises;
-const io = require('@actions/io');
 const github = require('@actions/github');
+const io = require('@actions/io');
 
 async function createCommentOnPullRequest(token, branch, comment) {
   const octokit = new github.GitHub(token);
@@ -31,6 +31,39 @@ async function createCommentOnPullRequest(token, branch, comment) {
   });
 }
 
+async function getCachePaths(command, configFilePath) {
+  let output = '';
+  const options = {
+    ignoreReturnCode: true,
+    listeners: {
+      stdout: data => { output += data.toString() }
+    }
+  };
+
+  const exitCode = await exec.exec(command, ['env', '--format', 'json', '-c', configFilePath], options);
+  if (exitCode === 0 && output) {
+    return JSON.parse(output).apps.map(app => app.cache_path);
+  }
+
+  return [];
+}
+
+function gitAddArgs(cachePaths) {
+  if (cachePaths.length == 0) {
+    return ['.'];
+  }
+
+  return cachePaths;
+}
+
+function gitDiffIndexArgs(cachePaths) {
+  if (cachePaths.length == 0) {
+    return [];
+  }
+
+  return ['--', ...cachePaths];
+}
+
 async function run() {
   try {
     const token = core.getInput('github_token', { required: true });
@@ -52,11 +85,14 @@ async function run() {
     }
     branch = branch.replace('refs/heads/', '');
 
+    const cachePaths = await getCachePaths(command, configFilePath);
+
     await exec.exec('git', ['checkout', branch]);
     await exec.exec(command, ['cache', '-c', configFilePath]);
-    await exec.exec('git', ['add', '.']);
 
-    const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD'], { ignoreReturnCode: true });
+    await exec.exec('git', ['add', ...gitAddArgs(cachePaths)]);
+
+    const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', ...gitDiffIndexArgs(cachePaths)], { ignoreReturnCode: true });
     if (exitCode > 0) {
       await exec.exec('git', ['remote', 'add', 'licensed-ci-origin', `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`]);
       await exec.exec('git', ['-c', `user.name=${userName}`, '-c', `user.email=${userEmail}`, 'commit', '-m', commitMessage]);

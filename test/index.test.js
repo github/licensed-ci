@@ -1,7 +1,6 @@
 const core = require('@actions/core');
 const { exec } = require('@actions/exec');
 const github = require('@actions/github');
-const os = require('os');
 const path = require('path');
 const stream = require('stream');
 
@@ -55,9 +54,9 @@ describe('licensed-ci', () => {
       },
       ignoreReturnCode: true,
       listeners: {
-        stdout: data => outString += data.toString() + os.EOL
+        stdout: data => outString += data.toString()
       },
-      outStream: new stream.Writable({ write: data => outString += data + os.EOL})
+      outStream: new stream.Writable({ write: () => { } })
     };
   });
 
@@ -129,10 +128,44 @@ describe('licensed-ci', () => {
     const exitCode = await exec('node', nodeArgs, options);
     expect(exitCode).toEqual(core.ExitCode.Success);
     expect(outString).toMatch(`git checkout ${branch}`);
+    expect(outString).toMatch(`${command} env --format json -c ${configFile}`);
     expect(outString).toMatch(`${command} cache -c ${configFile}`);
-    expect(outString).toMatch('git add .');
+    expect(outString).toMatch('git add');
     expect(outString).toMatch('git diff-index --quiet HEAD');
     expect(outString).toMatch(`${command} status -c ${configFile}`);
+  });
+
+  describe('without licensed env', () => {
+    beforeEach(() => {
+      options.env.EXEC_MOCKS = JSON.stringify([
+        { command: 'licensed env', exitCode: 1 },
+        { command: '', exitCode: 0 }
+      ]);
+    });
+
+    it('adds and checks all files in the repository', async () => {
+      const exitCode = await exec('node', nodeArgs, options);
+      expect(exitCode).toEqual(core.ExitCode.Success);
+      expect(outString).toMatch('git add .');
+      expect(outString).not.toMatch('git diff-index --quiet HEAD --');
+    });
+  });
+
+  describe('with licensed env', () => {
+    const env = { apps: [{ cache_path: 'project/licenses' }, { cache_path: 'test/licenses' }] };
+    beforeEach(() => {
+      options.env.EXEC_MOCKS = JSON.stringify([
+        { command: 'licensed env', stdout: JSON.stringify(env), exitCode: 0 },
+        { command: '', exitCode: 0 }
+      ]);
+    });
+
+    it('adds and checks licensed cache_paths', async () => {
+      const exitCode = await exec('node', nodeArgs, options);
+      expect(exitCode).toEqual(core.ExitCode.Success);
+      expect(outString).toMatch('git add project/licenses test/licenses');
+      expect(outString).toMatch('git diff-index --quiet HEAD -- project/licenses test/licenses');
+    });
   });
 
   it('raises an error if licensed status fails', async () => {
