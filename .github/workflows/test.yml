@@ -4,8 +4,14 @@ on: push
 jobs:
   npm_test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [ 10.x, 12.x ]
     steps:
     - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node }}
 
     - run: npm install
     - uses: jonabc/setup-licensed@v1
@@ -15,8 +21,14 @@ jobs:
 
   licensed_ci:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [ 10.x, 12.x ]
     steps:
     - uses: actions/checkout@v1
+    - uses: actions/setup-node@v1
+      with:
+        node-version: ${{ matrix.node }}
 
     - run: npm install --production
     - uses: jonabc/setup-licensed@v1
