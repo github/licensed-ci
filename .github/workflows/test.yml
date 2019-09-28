@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ 10.x, 8.x, 12.x ]
+        node: [ 10.x, 12.x ]
     steps:
     - uses: actions/checkout@v1
     - uses: actions/setup-node@v1
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ 10.x, 8.x, 12.x ]
+        node: [ 10.x, 12.x ]
     steps:
     - uses: actions/checkout@v1
     - uses: actions/setup-node@v1
