@@ -1,14 +1,31 @@
 const exec = require('@actions/exec');
 const sinon = require('sinon');
 
+const actionExec = exec.exec;
 const execMocks = JSON.parse(process.env.EXEC_MOCKS || '[]');
-sinon.stub(exec, 'exec').callsFake((command, args, options) => {
-  const optionsArray = Object.keys(options || {}).map(key => `${key}:${options[key]}`);
+sinon.stub(exec, 'exec').callsFake(async (command, args, options) => {
+  const optionsArray = Object.keys(options || {}).map(key => `${key}:${JSON.stringify(options[key])}`);
   const fullCommand = [command, ...args, ...optionsArray].join(' ');
   console.log(fullCommand);
 
+  let exitCode = 1;
   const mock = execMocks.find(mock => !!fullCommand.match(mock.command));
-  const exitCode = mock ? mock.exitCode : 0;
+  if (mock) {
+    if (mock.stdout) {
+      // echo the mocked stdout using the passed in options
+      await actionExec(`echo ${JSON.stringify(mock.stdout)}`, [], options);
+    }
+
+    if (mock.stderr) {
+      // echo the mocked stderr using the passed in options
+      await actionExec(`echo ${JSON.stringify(mock.stderr)} >&2`, [], options);
+    }
+
+    if (mock.exitCode || mock.exitCode === 0) {
+      exitCode = mock.exitCode;
+    }
+  }
+
   if (exitCode !== 0 && !options.ignoreReturnCode) {
     return Promise.reject(exitCode);
   }
