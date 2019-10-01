@@ -186,12 +186,13 @@ describe('ensureBranch', () => {
       mockExec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
 
       await utils.ensureBranch(branch, parent);
-      expect(outString).toMatch(`git checkout -b ${branch} ${parent}`);
+      expect(outString).toMatch(`git checkout ${parent}`);
+      expect(outString).toMatch(`git checkout -b ${branch}`);
     });
 
     it('raises an error if checkout and create fail', async () => {
       mockExec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
-      mockExec.mock({ command: `git checkout -b ${branch} ${parent}`, exitCode: 1 });
+      mockExec.mock({ command: `git checkout -b ${branch}`, exitCode: 1 });
 
       await expect(utils.ensureBranch(branch, parent)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
