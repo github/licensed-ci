@@ -1,5 +1,7 @@
 # licensed-ci
 
+![test](https://github.com/jonabc/licensed-ci/workflows/Test/badge.svg)
+
 Runs a [github/licensed](https://github.com/github/licensed) CI workflow.
 1. Run a workflow to update cached dependency metadata using `licensed cache` and push updates to GitHub
 1. Run `licensed status` to check that license data is available, known, up to date and valid for all dependencies
