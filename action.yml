@@ -27,6 +27,10 @@ inputs:
   pr_comment:
     description: 'Comment to add to a pull request, if one exists for the branch'
     required: false
+  workflow:
+    description: Which workflow to run when metadata is updated.  See README for more details.
+    required: false
+    default: push
 branding:
   icon: check-circle
   color: green
