@@ -19,7 +19,7 @@ describe('branch', () => {
   const command = 'licensed';
   const configFile = path.normalize(path.join(__dirname, '..', '..', '.licensed.yml'));
 
-  const branch = 'branch/licenses';
+  const branch = 'branch-licenses';
   const parent = 'branch';
 
   // to match the response from the testSearchResult.json fixture
