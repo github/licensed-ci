@@ -155,6 +155,7 @@ describe('cache', () => {
         { method: 'GET', uri: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'testSearchResult') },
       );
 
+
       await workflow.cache();
       const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
