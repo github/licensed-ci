@@ -4,42 +4,42 @@ const utils = require('../lib/utils');
 
 const mockExec = require('./mocks/@actions/exec');
 
-describe('getCommitInput', () => {
+describe('configureGitUser', () => {
+  let outString;
+
   beforeEach(() => {
-    process.env.INPUT_COMMIT_MESSAGE = 'message';
     process.env.INPUT_USER_NAME = 'user';
     process.env.INPUT_USER_EMAIL = 'email';
+
+    outString = '';
+    mockExec.setLog(log => outString += log + os.EOL);
+    mockExec.mock({ command: '', exitCode: 0 })
+  })
+
+  afterEach(() => {
+    mockExec.restore();
   });
 
-  it('raises an error when commit_message is not given', () => {
-    delete process.env.INPUT_COMMIT_MESSAGE;
-
-    expect(() => utils.getCommitInput()).toThrow(
-      'Input required and not supplied: commit_message'
-    );
-  });
-
-  it('raises an error when user_name is not given', () => {
+  it('raises an error when user_name is not given', async () => {
     delete process.env.INPUT_USER_NAME;
 
-    expect(() => utils.getCommitInput()).toThrow(
+    await expect(utils.configureGitUser()).rejects.toThrow(
       'Input required and not supplied: user_name'
     );
   });
 
-  it('raises an error when user_email is not given', () => {
+  it('raises an error when user_email is not given', async () => {
     delete process.env.INPUT_USER_EMAIL;
 
-    expect(() => utils.getCommitInput()).toThrow(
+    await expect(utils.configureGitUser()).rejects.toThrow(
       'Input required and not supplied: user_email'
     );
   });
 
-  it('returns the input values for committing updates', () => {
-    const { userName, userEmail, commitMessage } = utils.getCommitInput();
-    expect(userName).toEqual(process.env.INPUT_USER_NAME);
-    expect(userEmail).toEqual(process.env.INPUT_USER_EMAIL);
-    expect(commitMessage).toEqual(process.env.INPUT_COMMIT_MESSAGE);
+  it('configures the repository with the user name and email input', async () => {
+    await utils.configureGitUser();
+    expect(outString).toMatch(`git config user.name ${process.env.INPUT_USER_NAME}`);
+    expect(outString).toMatch(`git config user.email ${process.env.INPUT_USER_EMAIL}`);
   });
 });
 
