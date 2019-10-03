@@ -197,20 +197,28 @@ describe('status', () => {
     expect(utils.getBranch.callCount).toEqual(1);
   });
 
-  it('gives an error message on status failures on licenses branch', async () => {
+  it('gives an error message on status failures', async () => {
     mockExec.mock({ command: 'licensed status', exitCode: 1 });
     await expect(workflow.status()).rejects.toThrow(
-      'License updates failed status checks.  Please review the updated metadata to continue'
+      `${command} status failed`
     );
   });
 
-  it('gives an error message on status failures only on parent branch', async () => {
+  it('gives next steps when check on licenses branch succeeds', async () => {
     mockExec.mock([
       { command: 'licensed status', exitCode: 1, persist: false },
       { command: 'licensed status', exitCode: 0 }
     ]);
-    await expect(workflow.status()).rejects.toThrow(
-      `Please merge license updates from ${branch}`
-    );
+    await workflow.status().catch(() => {});
+    expect(outString).toMatch(`Please merge license updates from ${branch}`);
+  });
+
+  it('gives next steps when check on licenses branch succeeds', async () => {
+    mockExec.mock([
+      { command: 'licensed status', exitCode: 1, persist: false },
+      { command: 'licensed status', exitCode: 0 }
+    ]);
+    await workflow.status().catch(() => {});
+    expect(outString).toMatch(`Please review the updated metadata and update ${branch} as needed`);
   });
 });
