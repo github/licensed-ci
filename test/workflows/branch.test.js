@@ -226,6 +226,6 @@ describe('status', () => {
       { command: 'licensed status', exitCode: 0 }
     ]);
     await workflow.status().catch(() => {});
-    expect(outString).toMatch(`Please review the updated metadata and update ${branch} as needed`);
+    expect(outString).toMatch(`Please review and update ${branch} as needed`);
   });
 });
