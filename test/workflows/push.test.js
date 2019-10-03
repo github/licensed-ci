@@ -101,9 +101,8 @@ describe('cache', () => {
 
     it('pushes changes to origin', async () => {
       await workflow.cache();
-      expect(utils.getCommitInput.callCount).toEqual(1);
       expect(outString).toMatch(`git remote add licensed-ci-origin https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`);
-      expect(outString).toMatch(`git -c user.name=${userName} -c user.email=${userEmail} commit -m ${commitMessage}`);
+      expect(outString).toMatch(`git commit -m ${commitMessage}`);
       expect(outString).toMatch(`git push licensed-ci-origin ${branch}`)
     });
 
