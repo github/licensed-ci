@@ -100,6 +100,8 @@ describe('cache', () => {
     const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
     const createPREndpoint = octokit.pulls.create.endpoint({ owner, repo });
     const createPRUrl = createPREndpoint.url.replace('https://api.github.com', '');
+    const createReviewRequestEndpoint = octokit.pulls.createReviewRequest.endpoint({ owner, repo, pull_number: 1347 /* from fixture */ });
+    const createReviewRequestUrl = createReviewRequestEndpoint.url.replace('https://api.github.com', '');
 
     beforeEach(() => {
       mockExec.mock({ command: 'git diff-index', exitCode: 1 });
@@ -128,19 +130,24 @@ describe('cache', () => {
     it('opens a PR for changes', async () => {
       mockGitHub.mock([
         { method: 'GET', uri: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'emptySearchResult') },
-        { method: 'POST', uri: createPRUrl }
+        { method: 'POST', uri: createPRUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'pullRequest') },
+        { method: 'POST', url: createReviewRequestUrl }
       ]);
 
       await workflow.cache();
       const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
 
-      const match = outString.match(`POST ${createPRUrl} : (.+)`);
+      let match = outString.match(`POST ${createPRUrl} : (.+)`);
       expect(match).toBeTruthy();
-      const body = JSON.parse(match[1]);
+      let body = JSON.parse(match[1]);
       expect(body.head).toEqual(branch);
       expect(body.base).toEqual(parent);
-      expect(body.body).toMatch(`/cc @${process.env.GITHUB_ACTOR}`);
+
+      match = outString.match(`POST ${createReviewRequestUrl} : (.+)`);
+      expect(match).toBeTruthy();
+      body = JSON.parse(match[1]);
+      expect(body.reviewers).toEqual([process.env.GITHUB_ACTOR]);
     });
 
     it('does not open a PR for changes if it exists', async () => {
