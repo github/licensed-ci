@@ -15,7 +15,7 @@ function getOutputString(value) {
   }
 }
 
-sinon.stub(exec, 'exec').callsFake(async (command, args, options) => {
+sinon.stub(exec, 'exec').callsFake(async (command, args = [], options = {}) => {
   const optionsArray = Object.keys(options || {}).map(key => `${key}:${JSON.stringify(options[key])}`);
   const fullCommand = [command, ...args, ...optionsArray].join(' ');
   logMethod(fullCommand);
