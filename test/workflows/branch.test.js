@@ -204,18 +204,28 @@ describe('status', () => {
     expect(utils.getBranch.callCount).toEqual(1);
   });
 
-  it('gives an error message on status failures with a licenses branch', async () => {
-    process.env.GITHUB_REF = `refs/heads/${branch}`;
+  it('gives an error message on status failures', async () => {
     mockExec.mock({ command: 'licensed status', exitCode: 1 });
     await expect(workflow.status()).rejects.toThrow(
-      `License checks failed`
+      `${command} status failed`
     );
   });
 
-  it('gives an error message on status failures with a non-licenses branch', async () => {
-    mockExec.mock({ command: 'licensed status', exitCode: 1 });
-    await expect(workflow.status()).rejects.toThrow(
-      `License checks failed on ${parent}, please see changes to ${branch}`
-    );
+  it('gives next steps when check on licenses branch succeeds', async () => {
+    mockExec.mock([
+      { command: 'licensed status', exitCode: 1, count: 1 },
+      { command: 'licensed status', exitCode: 0 }
+    ]);
+    await workflow.status().catch(() => {});
+    expect(outString).toMatch(`Please merge license updates from ${branch}`);
+  });
+
+  it('gives next steps when check on licenses branch succeeds', async () => {
+    mockExec.mock([
+      { command: 'licensed status', exitCode: 1, count: 1 },
+      { command: 'licensed status', exitCode: 0 }
+    ]);
+    await workflow.status().catch(() => {});
+    expect(outString).toMatch(`Please review and update ${branch} as needed`);
   });
 });
