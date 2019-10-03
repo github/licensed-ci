@@ -39,6 +39,14 @@ sinon.stub(exec, 'exec').callsFake(async (command, args = [], options = {}) => {
     if (mock.exitCode || mock.exitCode === 0) {
       exitCode = mock.exitCode;
     }
+
+    if (mock.count > 0) {
+      mock.count -= 1;
+      if (mock.count === 0) {
+        const index = mocks.indexOf(mock);
+        mocks.splice(index, 1);
+      }
+    }
   }
 
   if (exitCode !== 0 && !options.ignoreReturnCode) {
