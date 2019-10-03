@@ -1,11 +1,13 @@
 const nock = require('nock');
 
-const apiMocks = JSON.parse(process.env.GITHUB_MOCKS || '[]');
+const mocks = [];
+let logMethod = console.log;
+
 function responseFunction(uri, requestBody) {
   // log the request to match against in tests
-  console.log(`${this.req.method} ${uri} : ${JSON.stringify(requestBody)}`);
+  logMethod(`${this.req.method} ${uri} : ${JSON.stringify(requestBody)}`);
 
-  const mock = apiMocks.find(mock => mock.method == this.req.method && uri.match(mock.uri));
+  const mock = mocks.find(mock => mock.method == this.req.method && uri.match(mock.uri));
   if (!mock) {
     // if the route wasn't mocked, return 404
     return [404, 'Route not mocked'];
@@ -27,3 +29,36 @@ nock('https://api.github.com')
   .post(/.*/).reply(responseFunction)
   .patch(/.*/).reply(responseFunction)
   .delete(/.*/).reply(responseFunction);
+
+function mock(mocksToAdd) {
+  if (Array.isArray(mocksToAdd)) {
+    mocks.unshift(...mocksToAdd)
+  } else {
+    mocks.unshift(mocksToAdd);
+  }
+}
+
+function clear() {
+  mocks.length = 0;
+}
+
+function restore() {
+  clear();
+  setLog(console.log);
+
+  // by default, add all mocks from the process environment
+  mock(JSON.parse(process.env.GITHUB_MOCKS || '[]'));
+}
+
+function setLog(method) {
+  logMethod = method;
+}
+
+restore();
+
+module.exports = {
+  mock,
+  clear,
+  restore,
+  setLog
+};
