@@ -4,12 +4,13 @@ const utils = require('../lib/utils');
 
 const mockExec = require('./mocks/@actions/exec');
 
-describe('configureGitUser', () => {
+describe('configureGit', () => {
   let outString;
 
   beforeEach(() => {
     process.env.INPUT_USER_NAME = 'user';
     process.env.INPUT_USER_EMAIL = 'email';
+    process.env.INPUT_GITHUB_TOKEN = 'token';
 
     outString = '';
     mockExec.setLog(log => outString += log + os.EOL);
@@ -23,7 +24,7 @@ describe('configureGitUser', () => {
   it('raises an error when user_name is not given', async () => {
     delete process.env.INPUT_USER_NAME;
 
-    await expect(utils.configureGitUser()).rejects.toThrow(
+    await expect(utils.configureGit()).rejects.toThrow(
       'Input required and not supplied: user_name'
     );
   });
@@ -31,15 +32,30 @@ describe('configureGitUser', () => {
   it('raises an error when user_email is not given', async () => {
     delete process.env.INPUT_USER_EMAIL;
 
-    await expect(utils.configureGitUser()).rejects.toThrow(
+    await expect(utils.configureGit()).rejects.toThrow(
       'Input required and not supplied: user_email'
     );
   });
 
+  it('raises an error when github_token is not given', async () => {
+    delete process.env.INPUT_GITHUB_TOKEN;
+
+    await expect(utils.configureGit()).rejects.toThrow(
+      'Input required and not supplied: github_token'
+    );
+  });
+
   it('configures the repository with the user name and email input', async () => {
-    await utils.configureGitUser();
+    await utils.configureGit();
     expect(outString).toMatch(`git config user.name ${process.env.INPUT_USER_NAME}`);
     expect(outString).toMatch(`git config user.email ${process.env.INPUT_USER_EMAIL}`);
+  });
+
+  it('configures the licensed-ci-origin remote', async () => {
+    await utils.configureGit();
+    expect(outString).toMatch(
+      `git remote add licensed-ci-origin https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`
+    );
   });
 });
 
