@@ -220,10 +220,10 @@ describe('status', () => {
     expect(outString).toMatch(`Please merge license updates from ${branch}`);
   });
 
-  it('gives next steps when check on licenses branch succeeds', async () => {
+  it('gives next steps when check on licenses branch fails', async () => {
     mockExec.mock([
       { command: 'licensed status', exitCode: 1, count: 1 },
-      { command: 'licensed status', exitCode: 0 }
+      { command: 'licensed status', exitCode: 1 }
     ]);
     await workflow.status().catch(() => {});
     expect(outString).toMatch(`Please review and update ${branch} as needed`);
