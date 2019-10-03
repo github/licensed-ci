@@ -165,6 +165,7 @@ describe('status', () => {
   const parent = 'branch';
 
   let outString;
+  let consoleLog;
 
   beforeEach(() => {
     process.env = {
@@ -180,12 +181,16 @@ describe('status', () => {
       { command: '', exitCode: 0 }
     ]);
 
+    consoleLog = console.log;
+    console.log = log => outString += log + os.EOL;
+
     Object.keys(utils).forEach(key => sinon.spy(utils, key));
   });
 
   afterEach(() => {
     sinon.restore();
     mockExec.restore();
+    console.log = consoleLog;
   });
 
   it('runs licensed status', async () => {
@@ -195,18 +200,20 @@ describe('status', () => {
     expect(utils.getBranch.callCount).toEqual(1);
   });
 
-  it('gives an error message on status failures with a licenses branch', async () => {
-    process.env.GITHUB_REF = `refs/heads/${branch}`;
+  it('gives an error message on status failures on licenses branch', async () => {
     mockExec.mock({ command: 'licensed status', exitCode: 1 });
     await expect(workflow.status()).rejects.toThrow(
-      `License checks failed`
+      'License updates failed status checks.  Please review the updated metadata to continue'
     );
   });
 
-  it('gives an error message on status failures with a non-licenses branch', async () => {
-    mockExec.mock({ command: 'licensed status', exitCode: 1 });
+  it('gives an error message on status failures only on parent branch', async () => {
+    mockExec.mock([
+      { command: 'licensed status', exitCode: 1, persist: false },
+      { command: 'licensed status', exitCode: 0 }
+    ]);
     await expect(workflow.status()).rejects.toThrow(
-      `License checks failed on ${parent}, please see changes to ${branch}`
+      `Please merge license updates from ${branch}`
     );
   });
 });
