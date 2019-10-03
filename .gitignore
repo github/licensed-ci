@@ -1,5 +1,5 @@
 # used for all-branch testing
-.licenses.ignored
+.licenses.ignored/**/*
 
 # Logs
 logs
