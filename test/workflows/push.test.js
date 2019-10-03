@@ -26,7 +26,6 @@ describe('cache', () => {
   const repo = 'repo';
 
   let outString;
-  let consoleLog;
 
   beforeEach(() => {
     process.env = {
@@ -44,8 +43,9 @@ describe('cache', () => {
     outString = '';
     mockExec.setLog(log => outString += log + os.EOL);
     mockGitHub.setLog(log => outString += log + os.EOL);
-    consoleLog = console.log;
-    console.log = log => outString += log + os.EOL;
+
+    sinon.stub(console, 'log').callsFake(log => outString += log + os.EOL);
+    sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
 
     mockExec.mock([
       { command: 'licensed env', exitCode: 1 },
@@ -58,7 +58,6 @@ describe('cache', () => {
   afterEach(() => {
     sinon.restore();
     mockExec.restore();
-    console.log = consoleLog;
   });
 
   it('runs a licensed ci workflow', async () => {
