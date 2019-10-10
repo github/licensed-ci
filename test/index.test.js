@@ -1,19 +1,8 @@
 const core = require('@actions/core');
-const { exec } = require('@actions/exec');
 const path = require('path');
-const stream = require('stream');
+const { run } = require('@jonabc/actions-mocks');
 
-// arguments to call with `node` in a child process
-const nodeArgs = [
-  // multi-file loader to help loading the rest of the files in a single `node` call
-  path.join(__dirname, 'helpers', 'loader'),
-  // load mocks for @actions/exec
-  path.join(__dirname, 'mocks', '@actions', 'exec'),
-  // load mocks for @actions/github
-  path.join(__dirname, 'mocks', '@actions', 'github'),
-  // load and run the app
-  path.normalize(path.join(__dirname, '..', 'lib', 'index'))
-];
+const action = path.normalize(path.join(__dirname, '..', 'lib', 'index'));
 
 describe('licensed-ci', () => {
   const token = 'token';
@@ -29,11 +18,9 @@ describe('licensed-ci', () => {
   const owner = 'jonabc';
   const repo = 'repo';
 
-  let outString;
   let options;
 
   beforeEach(() => {
-    outString = '';
     options = {
       env: {
         ...process.env,
@@ -44,31 +31,28 @@ describe('licensed-ci', () => {
         INPUT_COMMAND: command,
         INPUT_CONFIG_FILE: configFile,
         GITHUB_REF: `refs/heads/${branch}`,
-        GITHUB_REPOSITORY: `${owner}/${repo}`,
-        EXEC_MOCKS: JSON.stringify([
+        GITHUB_REPOSITORY: `${owner}/${repo}`
+      },
+      mocks: {
+        exec: [
           { command: '', exitCode: 0 }
-        ])
-      },
-      ignoreReturnCode: true,
-      listeners: {
-        stdout: data => outString += data.toString()
-      },
-      outStream: new stream.Writable({ write: () => {} })
+        ]
+      }
     };
   });
 
   it('raises an error a workflow is not provided', async () => {
-    const exitCode = await exec('node', nodeArgs, options);
-    expect(exitCode).toEqual(core.ExitCode.Failure);
-    expect(outString).toMatch('Input required and not supplied: workflow');
+    const { out, status } = await run(action, options);
+    expect(status).toEqual(core.ExitCode.Failure);
+    expect(out).toMatch('Input required and not supplied: workflow');
   });
 
   it('raises an error if workflow input is not valid', async () => {
     options.env.INPUT_WORKFLOW = 'invalid';
 
-    const exitCode = await exec('node', nodeArgs, options);
-    expect(exitCode).toEqual(core.ExitCode.Failure);
-    expect(outString).toMatch(
+    const { out, status } = await run(action, options);
+    expect(status).toEqual(core.ExitCode.Failure);
+    expect(out).toMatch(
       `Workflow input value "invalid" must be one of: branch, push`
     );
   });
@@ -76,13 +60,13 @@ describe('licensed-ci', () => {
   it('runs a licensed ci workflow', async () => {
     options.env.INPUT_WORKFLOW = 'push';
 
-    const exitCode = await exec('node', nodeArgs, options);
-    expect(exitCode).toEqual(core.ExitCode.Success);
-    expect(outString).toMatch(`git checkout ${branch}`);
-    expect(outString).toMatch(`${command} env --format json -c ${configFile}`);
-    expect(outString).toMatch(`${command} cache -c ${configFile}`);
-    expect(outString).toMatch('git add');
-    expect(outString).toMatch('git diff-index --quiet HEAD');
-    expect(outString).toMatch(`${command} status -c ${configFile}`);
+    const { out, status } = await run(action, options);
+    expect(status).toEqual(core.ExitCode.Success);
+    expect(out).toMatch(`git checkout ${branch}`);
+    expect(out).toMatch(`${command} env --format json -c ${configFile}`);
+    expect(out).toMatch(`${command} cache -c ${configFile}`);
+    expect(out).toMatch('git add');
+    expect(out).toMatch('git diff-index --quiet HEAD');
+    expect(out).toMatch(`${command} status -c ${configFile}`);
   });
 });

@@ -1,13 +1,10 @@
 const github = require('@actions/github');
-const nock = require('nock');
+const { mocks } = require('@jonabc/actions-mocks');
 const os = require('os');
 const path = require('path');
 const sinon = require('sinon');
 const utils = require('../../lib/utils');
 const workflow = require('../../lib/workflows/branch');
-
-const mockExec = require('../mocks/@actions/exec');
-const mockGitHub = require('../mocks/@actions/github');
 
 const octokit = new github.GitHub('token');
 
@@ -43,13 +40,13 @@ describe('cache', () => {
     };
 
     outString = '';
-    mockExec.setLog(log => outString += log + os.EOL);
-    mockGitHub.setLog(log => outString += log + os.EOL);
+    mocks.exec.setLog(log => outString += log + os.EOL);
+    mocks.github.setLog(log => outString += log + os.EOL);
 
     sinon.stub(console, 'log').callsFake(log => outString += log + os.EOL);
     sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
 
-    mockExec.mock([
+    mocks.exec.mock([
       { command: 'licensed env', exitCode: 1 },
       { command: '', exitCode: 0 }
     ]);
@@ -59,7 +56,7 @@ describe('cache', () => {
 
   afterEach(() => {
     sinon.restore();
-    mockExec.restore();
+    mocks.exec.restore();
   });
 
   it('runs a licensed ci workflow', async () => {
@@ -104,11 +101,11 @@ describe('cache', () => {
     const createReviewRequestUrl = createReviewRequestEndpoint.url.replace('https://api.github.com', '');
 
     beforeEach(() => {
-      mockExec.mock({ command: 'git diff-index', exitCode: 1 });
-      mockGitHub.mock({
+      mocks.exec.mock({ command: 'git diff-index', exitCode: 1 });
+      mocks.github.mock({
         method: 'GET',
         uri: issuesSearchUrl,
-        responseFixture: path.join(__dirname, '..', 'fixtures', 'testSearchResult')
+        response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'))
       });
     });
 
@@ -127,9 +124,9 @@ describe('cache', () => {
     });
 
     it('opens a PR for changes', async () => {
-      mockGitHub.mock([
-        { method: 'GET', uri: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'emptySearchResult') },
-        { method: 'POST', uri: createPRUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'pullRequest') },
+      mocks.github.mock([
+        { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult')) },
+        { method: 'POST', uri: createPRUrl, response: require(path.join(__dirname, '..', 'fixtures', 'pullRequest')) },
         { method: 'POST', url: createReviewRequestUrl }
       ]);
 
@@ -150,8 +147,8 @@ describe('cache', () => {
     });
 
     it('does not open a PR for changes if it exists', async () => {
-      mockGitHub.mock(
-        { method: 'GET', uri: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'testSearchResult') },
+      mocks.github.mock(
+        { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult')) },
       );
 
       await workflow.cache();
@@ -180,8 +177,8 @@ describe('status', () => {
     };
 
     outString = '';
-    mockExec.setLog(log => outString += log + os.EOL);
-    mockExec.mock([
+    mocks.exec.setLog(log => outString += log + os.EOL);
+    mocks.exec.mock([
       { command: '', exitCode: 0 }
     ]);
 
@@ -193,7 +190,7 @@ describe('status', () => {
 
   afterEach(() => {
     sinon.restore();
-    mockExec.restore();
+    mocks.exec.restore();
   });
 
   it('runs licensed status', async () => {
@@ -204,14 +201,14 @@ describe('status', () => {
   });
 
   it('gives an error message on status failures', async () => {
-    mockExec.mock({ command: 'licensed status', exitCode: 1 });
+    mocks.exec.mock({ command: 'licensed status', exitCode: 1 });
     await expect(workflow.status()).rejects.toThrow(
       `${command} status failed`
     );
   });
 
   it('gives next steps when check on licenses branch succeeds', async () => {
-    mockExec.mock([
+    mocks.exec.mock([
       { command: 'licensed status', exitCode: 1, count: 1 },
       { command: 'licensed status', exitCode: 0 }
     ]);
@@ -220,7 +217,7 @@ describe('status', () => {
   });
 
   it('gives next steps when check on licenses branch fails', async () => {
-    mockExec.mock([
+    mocks.exec.mock([
       { command: 'licensed status', exitCode: 1, count: 1 },
       { command: 'licensed status', exitCode: 1 }
     ]);
