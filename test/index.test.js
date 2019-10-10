@@ -42,18 +42,16 @@ describe('licensed-ci', () => {
   });
 
   it('raises an error a workflow is not provided', async () => {
-    const { out, err, status } = await run(action, options);
+    const { out, status } = await run(action, options);
     expect(status).toEqual(core.ExitCode.Failure);
-    expect(err).toEqual('');
     expect(out).toMatch('Input required and not supplied: workflow');
   });
 
   it('raises an error if workflow input is not valid', async () => {
     options.env.INPUT_WORKFLOW = 'invalid';
 
-    const { out, err, status } = await run(action, options);
+    const { out, status } = await run(action, options);
     expect(status).toEqual(core.ExitCode.Failure);
-    expect(err).toEqual('');
     expect(out).toMatch(
       `Workflow input value "invalid" must be one of: branch, push`
     );
@@ -62,9 +60,8 @@ describe('licensed-ci', () => {
   it('runs a licensed ci workflow', async () => {
     options.env.INPUT_WORKFLOW = 'push';
 
-    const { out, err, status } = await run(action, options);
+    const { out, status } = await run(action, options);
     expect(status).toEqual(core.ExitCode.Success);
-    expect(err).toEqual('');
     expect(out).toMatch(`git checkout ${branch}`);
     expect(out).toMatch(`${command} env --format json -c ${configFile}`);
     expect(out).toMatch(`${command} cache -c ${configFile}`);
