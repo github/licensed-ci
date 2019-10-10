@@ -1,8 +1,7 @@
+const { mocks } = require('@jonabc/actions-mocks');
 const path = require('path');
 const os = require('os');
 const utils = require('../lib/utils');
-
-const mockExec = require('./mocks/@actions/exec');
 
 describe('configureGit', () => {
   let outString;
@@ -13,12 +12,12 @@ describe('configureGit', () => {
     process.env.INPUT_GITHUB_TOKEN = 'token';
 
     outString = '';
-    mockExec.setLog(log => outString += log + os.EOL);
-    mockExec.mock({ command: '', exitCode: 0 })
+    mocks.exec.setLog(log => outString += log + os.EOL);
+    mocks.exec.mock({ command: '', exitCode: 0 })
   })
 
   afterEach(() => {
-    mockExec.restore();
+    mocks.exec.restore();
   });
 
   it('raises an error when user_name is not given', async () => {
@@ -140,23 +139,23 @@ describe('getCachePaths', () => {
 
   beforeEach(() => {
     outString = '';
-    mockExec.setLog(log => outString += log + os.EOL);
-    mockExec.mock({ command: '', exitCode: 0 })
+    mocks.exec.setLog(log => outString += log + os.EOL);
+    mocks.exec.mock({ command: '', exitCode: 0 })
   })
 
   afterEach(() => {
-    mockExec.restore();
+    mocks.exec.restore();
   });
 
   it('calls licensed env', async () => {
-    mockExec.mock({ command: 'licensed env', exitCode: 1 });
+    mocks.exec.mock({ command: 'licensed env', exitCode: 1 });
 
     await utils.getCachePaths(command, configFile);
     expect(outString).toMatch(`licensed env --format json -c ${configFile}`);
   });
 
   it('returns default paths if licensed env is not available', async () => {
-    mockExec.mock({ command: 'licensed env', exitCode: 1 });
+    mocks.exec.mock({ command: 'licensed env', exitCode: 1 });
 
     const cachePaths = await utils.getCachePaths(command, configFile);
     expect(cachePaths).toEqual(['.']);
@@ -169,7 +168,7 @@ describe('getCachePaths', () => {
         { cache_path: 'test/licenses' }
       ]
     };
-    mockExec.mock({ command: 'licensed env', stdout: JSON.stringify(env), exitCode: 0 });
+    mocks.exec.mock({ command: 'licensed env', stdout: JSON.stringify(env), exitCode: 0 });
 
     const cachePaths = await utils.getCachePaths(command, configFile);
     expect(cachePaths).toEqual(['project/licenses', 'test/licenses']);
@@ -184,12 +183,12 @@ describe('ensureBranch', () => {
 
   beforeEach(() => {
     outString = '';
-    mockExec.setLog(log => outString += log);
-    mockExec.mock({ command: '', exitCode: 0 });
+    mocks.exec.setLog(log => outString += log);
+    mocks.exec.mock({ command: '', exitCode: 0 });
   })
 
   afterEach(() => {
-    mockExec.restore();
+    mocks.exec.restore();
   });
 
   it('checks out a branch if it exists', async () => {
@@ -199,7 +198,7 @@ describe('ensureBranch', () => {
 
   describe('when branch !== parent', () => {
     it('creates a branch if it doesn\'t exist', async () => {
-      mockExec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
+      mocks.exec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
 
       await utils.ensureBranch(branch, parent);
       expect(outString).toMatch(`git checkout ${parent}`);
@@ -207,8 +206,8 @@ describe('ensureBranch', () => {
     });
 
     it('raises an error if checkout and create fail', async () => {
-      mockExec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
-      mockExec.mock({ command: `git checkout -b ${branch}`, exitCode: 1 });
+      mocks.exec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
+      mocks.exec.mock({ command: `git checkout -b ${branch}`, exitCode: 1 });
 
       await expect(utils.ensureBranch(branch, parent)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
@@ -221,7 +220,7 @@ describe('ensureBranch', () => {
     });
 
     it('raises an error if rebasing failed', async () => {
-      mockExec.mock({ command: `git rebase ${parent} ${branch}`, exitCode: 1 });
+      mocks.exec.mock({ command: `git rebase ${parent} ${branch}`, exitCode: 1 });
 
       await expect(utils.ensureBranch(branch, parent)).rejects.toThrow(
         `Unable to get ${branch} up to date with ${parent}`
@@ -231,14 +230,14 @@ describe('ensureBranch', () => {
 
   describe('when branch === parent', () => {
     it('does not create branch if it doesn\t exist', async () => {
-      mockExec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
+      mocks.exec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
 
       await utils.ensureBranch(branch, branch).catch(() => {});
       expect(outString).not.toMatch(`git checkout -b ${branch} ${branch}`);
     });
 
     it('raises an error if checkout fails', async () => {
-      mockExec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
+      mocks.exec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
 
       await expect(utils.ensureBranch(branch, branch)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
