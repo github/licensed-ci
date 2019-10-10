@@ -110,7 +110,10 @@ describe('cache', () => {
     it('does not comment if PR is not found', async () => {
       process.env.INPUT_PR_COMMENT = 'Auto updated files';
 
-      mocks.github.mock({ method: 'GET', uci: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'emptySearchResult') });
+      const searchResultFixture = path.join(__dirname, '..', 'fixtures', 'emptySearchResult');
+      mocks.github.mock(
+        { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) }
+      );
 
       await workflow.cache();
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
@@ -120,8 +123,9 @@ describe('cache', () => {
     it('comments if input is given and PR is open', async () => {
       process.env.INPUT_PR_COMMENT = 'Auto updated files';
 
+      const searchResultFixture = path.join(__dirname, '..', 'fixtures', 'testSearchResult');
       mocks.github.mock([
-        { method: 'GET', uri: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'testSearchResult') },
+        { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) },
         { method: 'POST', uri: createCommentUrl }
       ]);
 

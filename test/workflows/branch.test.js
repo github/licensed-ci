@@ -105,7 +105,7 @@ describe('cache', () => {
       mocks.github.mock({
         method: 'GET',
         uri: issuesSearchUrl,
-        responseFixture: path.join(__dirname, '..', 'fixtures', 'testSearchResult')
+        response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'))
       });
     });
 
@@ -125,8 +125,8 @@ describe('cache', () => {
 
     it('opens a PR for changes', async () => {
       mocks.github.mock([
-        { method: 'GET', uri: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'emptySearchResult') },
-        { method: 'POST', uri: createPRUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'pullRequest') },
+        { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult')) },
+        { method: 'POST', uri: createPRUrl, response: require(path.join(__dirname, '..', 'fixtures', 'pullRequest')) },
         { method: 'POST', url: createReviewRequestUrl }
       ]);
 
@@ -148,7 +148,7 @@ describe('cache', () => {
 
     it('does not open a PR for changes if it exists', async () => {
       mocks.github.mock(
-        { method: 'GET', uri: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'testSearchResult') },
+        { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult')) },
       );
 
       await workflow.cache();
