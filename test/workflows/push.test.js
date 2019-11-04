@@ -1,13 +1,10 @@
 const github = require('@actions/github');
-const nock = require('nock');
+const { mocks } = require('@jonabc/actions-mocks');
 const os = require('os');
 const path = require('path');
 const sinon = require('sinon').createSandbox();
 const utils = require('../../lib/utils');
 const workflow = require('../../lib/workflows/push');
-
-const mockExec = require('../mocks/@actions/exec');
-const mockGitHub = require('../mocks/@actions/github');
 
 const octokit = new github.GitHub('token');
 
@@ -41,13 +38,13 @@ describe('cache', () => {
     };
 
     outString = '';
-    mockExec.setLog(log => outString += log + os.EOL);
-    mockGitHub.setLog(log => outString += log + os.EOL);
+    mocks.exec.setLog(log => outString += log + os.EOL);
+    mocks.github.setLog(log => outString += log + os.EOL);
 
     sinon.stub(console, 'log').callsFake(log => outString += log + os.EOL);
     sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
 
-    mockExec.mock([
+    mocks.exec.mock([
       { command: 'licensed env', exitCode: 1 },
       { command: '', exitCode: 0 }
     ]);
@@ -57,7 +54,7 @@ describe('cache', () => {
 
   afterEach(() => {
     sinon.restore();
-    mockExec.restore();
+    mocks.exec.restore();
   });
 
   it('runs a licensed ci workflow', async () => {
@@ -87,7 +84,7 @@ describe('cache', () => {
     const createCommentUrl = createCommentEndpoint.url.replace('https://api.github.com', '');
 
     beforeEach(() => {
-      mockExec.mock({ command: 'git diff-index', exitCode: 1 });
+      mocks.exec.mock({ command: 'git diff-index', exitCode: 1 });
     });
 
     it('raises an error when github_token is not given', async () => {
@@ -113,7 +110,10 @@ describe('cache', () => {
     it('does not comment if PR is not found', async () => {
       process.env.INPUT_PR_COMMENT = 'Auto updated files';
 
-      mockGitHub.mock({ method: 'GET', uci: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'emptySearchResult') });
+      const searchResultFixture = path.join(__dirname, '..', 'fixtures', 'emptySearchResult');
+      mocks.github.mock(
+        { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) }
+      );
 
       await workflow.cache();
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
@@ -123,8 +123,9 @@ describe('cache', () => {
     it('comments if input is given and PR is open', async () => {
       process.env.INPUT_PR_COMMENT = 'Auto updated files';
 
-      mockGitHub.mock([
-        { method: 'GET', uri: issuesSearchUrl, responseFixture: path.join(__dirname, '..', 'fixtures', 'testSearchResult') },
+      const searchResultFixture = path.join(__dirname, '..', 'fixtures', 'testSearchResult');
+      mocks.github.mock([
+        { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) },
         { method: 'POST', uri: createCommentUrl }
       ]);
 
@@ -153,9 +154,12 @@ describe('status', () => {
     };
 
     outString = '';
-    mockExec.setLog(log => outString += log + os.EOL);
-    mockExec.mock([
-      { command: '', exitCode: 0 }
+    mocks.exec.setLog(log => outString += log + os.EOL);
+
+    sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
+
+    mocks.exec.mock([
+      { command: `${command} status`, exitCode: 0, stdout: 'status output' }
     ]);
 
     Object.keys(utils).forEach(key => sinon.spy(utils, key));
@@ -163,7 +167,7 @@ describe('status', () => {
 
   afterEach(() => {
     sinon.restore();
-    mockExec.restore();
+    mocks.exec.restore();
   });
 
   it('runs licensed status', async () => {
@@ -172,8 +176,9 @@ describe('status', () => {
     expect(utils.getLicensedInput.callCount).toEqual(1);
   });
 
-  it('gives an error message on status failures', async () => {
-    mockExec.mock({ command: `${command} status`, exitCode: 1 });
-    await expect(workflow.status()).rejects.toEqual(1);
+  it('returns information about the status call', async () => {
+    const result = await workflow.status();
+    expect(result.success).toEqual(true);
+    expect(result.log).toEqual('status output');
   });
 });
