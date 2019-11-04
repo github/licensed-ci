@@ -24,6 +24,7 @@ describe('cache', () => {
   const repo = 'repo';
 
   let outString;
+  const processEnv = process.env;
 
   beforeEach(() => {
     process.env = {
@@ -55,6 +56,7 @@ describe('cache', () => {
   });
 
   afterEach(() => {
+    process.env = processEnv;
     sinon.restore();
     mocks.exec.restore();
   });
@@ -124,6 +126,8 @@ describe('cache', () => {
     });
 
     it('opens a PR for changes', async () => {
+      process.env.INPUT_PR_COMMENT = 'pr_comment';
+      mocks.exec.mock({ command: 'licensed status', returns: 0, stdout: 'licenses-success' });
       mocks.github.mock([
         { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult')) },
         { method: 'POST', uri: createPRUrl, response: require(path.join(__dirname, '..', 'fixtures', 'pullRequest')) },
@@ -139,6 +143,12 @@ describe('cache', () => {
       let body = JSON.parse(match[1]);
       expect(body.head).toEqual(branch);
       expect(body.base).toEqual(parent);
+
+      // minimal expectations about PR body template substitutions
+      expect(body.body).toMatch(parent);
+      expect(body.body).toMatch(process.env.INPUT_PR_COMMENT);
+      expect(body.body).toMatch('succeeded');
+      expect(body.body).toMatch('licenses-success');
 
       match = outString.match(`POST ${createReviewRequestUrl} : (.+)`);
       expect(match).toBeTruthy();
@@ -179,7 +189,7 @@ describe('status', () => {
     outString = '';
     mocks.exec.setLog(log => outString += log + os.EOL);
     mocks.exec.mock([
-      { command: '', exitCode: 0 }
+      { command: `${command} status`, exitCode: 0, stdout: 'status output' }
     ]);
 
     sinon.stub(console, 'log').callsFake(log => outString += log);
@@ -200,28 +210,9 @@ describe('status', () => {
     expect(utils.getBranch.callCount).toEqual(1);
   });
 
-  it('gives an error message on status failures', async () => {
-    mocks.exec.mock({ command: 'licensed status', exitCode: 1 });
-    await expect(workflow.status()).rejects.toThrow(
-      `${command} status failed`
-    );
-  });
-
-  it('gives next steps when check on licenses branch succeeds', async () => {
-    mocks.exec.mock([
-      { command: 'licensed status', exitCode: 1, count: 1 },
-      { command: 'licensed status', exitCode: 0 }
-    ]);
-    await workflow.status().catch(() => {});
-    expect(outString).toMatch(`Please merge license updates from ${branch}`);
-  });
-
-  it('gives next steps when check on licenses branch fails', async () => {
-    mocks.exec.mock([
-      { command: 'licensed status', exitCode: 1, count: 1 },
-      { command: 'licensed status', exitCode: 1 }
-    ]);
-    await workflow.status().catch(() => {});
-    expect(outString).toMatch(`Please review and update ${branch} as needed`);
+  it('returns information about the status call', async () => {
+    const result = await workflow.status();
+    expect(result.success).toEqual(true);
+    expect(result.log).toEqual('status output');
   });
 });

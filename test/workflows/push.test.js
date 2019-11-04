@@ -155,8 +155,11 @@ describe('status', () => {
 
     outString = '';
     mocks.exec.setLog(log => outString += log + os.EOL);
+
+    sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
+
     mocks.exec.mock([
-      { command: '', exitCode: 0 }
+      { command: `${command} status`, exitCode: 0, stdout: 'status output' }
     ]);
 
     Object.keys(utils).forEach(key => sinon.spy(utils, key));
@@ -173,8 +176,9 @@ describe('status', () => {
     expect(utils.getLicensedInput.callCount).toEqual(1);
   });
 
-  it('gives an error message on status failures', async () => {
-    mocks.exec.mock({ command: `${command} status`, exitCode: 1 });
-    await expect(workflow.status()).rejects.toEqual(1);
+  it('returns information about the status call', async () => {
+    const result = await workflow.status();
+    expect(result.success).toEqual(true);
+    expect(result.log).toEqual('status output');
   });
 });

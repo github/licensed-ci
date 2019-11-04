@@ -30,6 +30,7 @@ describe('licensed-ci', () => {
         INPUT_USER_EMAIL: userEmail,
         INPUT_COMMAND: command,
         INPUT_CONFIG_FILE: configFile,
+        INPUT_WORKFLOW: 'push',
         GITHUB_REF: `refs/heads/${branch}`,
         GITHUB_REPOSITORY: `${owner}/${repo}`
       },
@@ -42,6 +43,7 @@ describe('licensed-ci', () => {
   });
 
   it('raises an error a workflow is not provided', async () => {
+    delete options.env.INPUT_WORKFLOW;
     const { out, status } = await run(action, options);
     expect(status).toEqual(core.ExitCode.Failure);
     expect(out).toMatch('Input required and not supplied: workflow');
@@ -58,15 +60,22 @@ describe('licensed-ci', () => {
   });
 
   it('runs a licensed ci workflow', async () => {
-    options.env.INPUT_WORKFLOW = 'push';
+    options.mocks.exec.unshift({ command: 'licensed status', exitCode: 1 });
 
     const { out, status } = await run(action, options);
     expect(status).toEqual(core.ExitCode.Success);
+    expect(out).toMatch(`${command} status -c ${configFile}`);
     expect(out).toMatch(`git checkout ${branch}`);
     expect(out).toMatch(`${command} env --format json -c ${configFile}`);
     expect(out).toMatch(`${command} cache -c ${configFile}`);
     expect(out).toMatch('git add');
     expect(out).toMatch('git diff-index --quiet HEAD');
+  });
+
+  it('does not cache data if no changes are needed', async () => {
+    const { out, status } = await run(action, options);
+    expect(status).toEqual(core.ExitCode.Success);
     expect(out).toMatch(`${command} status -c ${configFile}`);
+    expect(out).not.toMatch(`${command} cache -c ${configFile}`);
   });
 });
