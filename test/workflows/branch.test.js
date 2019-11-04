@@ -179,7 +179,7 @@ describe('status', () => {
     outString = '';
     mocks.exec.setLog(log => outString += log + os.EOL);
     mocks.exec.mock([
-      { command: '', exitCode: 0 }
+      { command: `${command} status`, exitCode: 0, stdout: 'status output' }
     ]);
 
     sinon.stub(console, 'log').callsFake(log => outString += log);
@@ -200,28 +200,9 @@ describe('status', () => {
     expect(utils.getBranch.callCount).toEqual(1);
   });
 
-  it('gives an error message on status failures', async () => {
-    mocks.exec.mock({ command: 'licensed status', exitCode: 1 });
-    await expect(workflow.status()).rejects.toThrow(
-      `${command} status failed`
-    );
-  });
-
-  it('gives next steps when check on licenses branch succeeds', async () => {
-    mocks.exec.mock([
-      { command: 'licensed status', exitCode: 1, count: 1 },
-      { command: 'licensed status', exitCode: 0 }
-    ]);
-    await workflow.status().catch(() => {});
-    expect(outString).toMatch(`Please merge license updates from ${branch}`);
-  });
-
-  it('gives next steps when check on licenses branch fails', async () => {
-    mocks.exec.mock([
-      { command: 'licensed status', exitCode: 1, count: 1 },
-      { command: 'licensed status', exitCode: 1 }
-    ]);
-    await workflow.status().catch(() => {});
-    expect(outString).toMatch(`Please review and update ${branch} as needed`);
+  it('returns information about the status call', async () => {
+    const result = await workflow.status();
+    expect(result.success).toEqual(true);
+    expect(result.log).toEqual('status output');
   });
 });
