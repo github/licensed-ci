@@ -24,6 +24,7 @@ describe('cache', () => {
   const repo = 'repo';
 
   let outString;
+  const processEnv = process.env;
 
   beforeEach(() => {
     process.env = {
@@ -55,6 +56,7 @@ describe('cache', () => {
   });
 
   afterEach(() => {
+    process.env = processEnv;
     sinon.restore();
     mocks.exec.restore();
   });
@@ -124,6 +126,8 @@ describe('cache', () => {
     });
 
     it('opens a PR for changes', async () => {
+      process.env.INPUT_PR_COMMENT = 'pr_comment';
+      mocks.exec.mock({ command: 'licensed status', returns: 0, stdout: 'licenses-success' });
       mocks.github.mock([
         { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult')) },
         { method: 'POST', uri: createPRUrl, response: require(path.join(__dirname, '..', 'fixtures', 'pullRequest')) },
@@ -139,6 +143,12 @@ describe('cache', () => {
       let body = JSON.parse(match[1]);
       expect(body.head).toEqual(branch);
       expect(body.base).toEqual(parent);
+
+      // minimal expectations about PR body template substitutions
+      expect(body.body).toMatch(parent);
+      expect(body.body).toMatch(process.env.INPUT_PR_COMMENT);
+      expect(body.body).toMatch('succeeded');
+      expect(body.body).toMatch('licenses-success');
 
       match = outString.match(`POST ${createReviewRequestUrl} : (.+)`);
       expect(match).toBeTruthy();
