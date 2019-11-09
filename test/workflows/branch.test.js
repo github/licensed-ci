@@ -8,7 +8,7 @@ const workflow = require('../../lib/workflows/branch');
 
 const octokit = new github.GitHub('token');
 
-describe('cache', () => {
+describe('branch workflow', () => {
   const token = 'token';
   const userName = 'user';
   const userEmail = 'user@example.com';
@@ -49,6 +49,7 @@ describe('cache', () => {
 
     mocks.exec.mock([
       { command: 'licensed env', exitCode: 1 },
+      { command: 'licensed status', exitCode: 1 },
       { command: '', exitCode: 0 }
     ]);
 
@@ -61,10 +62,17 @@ describe('cache', () => {
     mocks.exec.restore();
   });
 
+  it('does not cache data if no changes are needed', async () => {
+    mocks.exec.mock({ command: 'licensed status', exitCode: 0 })
+    await workflow();
+    expect(outString).toMatch(`${command} status -c ${configFile}`);
+    expect(outString).not.toMatch(`${command} cache -c ${configFile}`);
+  });
+
   it('runs a licensed ci workflow', async () => {
-    await workflow.cache();
+    await expect(workflow()).rejects.toThrow('Cached metadata checks failed');
     expect(utils.getBranch.callCount).toEqual(1);
-    expect(utils.getLicensedInput.callCount).toEqual(1);
+    expect(utils.getLicensedInput.callCount).toBeGreaterThan(1);
     expect(utils.ensureBranch.withArgs(branch, parent).callCount).toEqual(1);
     expect(outString).toMatch(`${command} cache -c ${configFile}`);
     expect(utils.getCachePaths.callCount).toEqual(1);
@@ -74,11 +82,11 @@ describe('cache', () => {
     expect(outString).toMatch(`git checkout ${parent}`);
   });
 
-  it('does not run full ci workflow on licenses branch', async () => {
+  it('does not cache metadata on licenses branch', async () => {
     process.env.GITHUB_REF = `refs/heads/${branch}`;
-    await workflow.cache();
+    await expect(workflow()).rejects.toThrow();
     expect(utils.getBranch.callCount).toEqual(1);
-    expect(utils.getLicensedInput.callCount).toEqual(0);
+    expect(utils.getLicensedInput.callCount).toEqual(1);
     expect(utils.ensureBranch.callCount).toEqual(0);
     expect(outString).not.toMatch(`${command} cache -c ${configFile}`);
     expect(utils.getCachePaths.callCount).toEqual(0);
@@ -89,7 +97,7 @@ describe('cache', () => {
 
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
-      await workflow.cache();
+      await expect(workflow()).rejects.toThrow();
       expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`)
     });
   });
@@ -114,27 +122,30 @@ describe('cache', () => {
     it('raises an error when github_token is not given', async () => {
       delete process.env.INPUT_GITHUB_TOKEN;
 
-      await expect(workflow.cache()).rejects.toThrow(
+      await expect(workflow()).rejects.toThrow(
         'Input required and not supplied: github_token'
       );
     });
 
     it('pushes changes to origin', async () => {
-      await workflow.cache();
+      await expect(workflow()).rejects.toThrow();
       expect(outString).toMatch(`git commit -m ${commitMessage}`);
       expect(outString).toMatch(`git push licensed-ci-origin ${branch}`)
     });
 
     it('opens a PR for changes', async () => {
       process.env.INPUT_PR_COMMENT = 'pr_comment';
-      mocks.exec.mock({ command: 'licensed status', returns: 0, stdout: 'licenses-success' });
+      mocks.exec.mock([
+        { command: 'licensed status', exitCode: 1, count: 1 },
+        { command: 'licensed status', exitCode: 0, stdout: 'licenses-success' }
+      ]);
       mocks.github.mock([
         { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult')) },
         { method: 'POST', uri: createPRUrl, response: require(path.join(__dirname, '..', 'fixtures', 'pullRequest')) },
         { method: 'POST', url: createReviewRequestUrl }
       ]);
 
-      await workflow.cache();
+      await expect(workflow()).rejects.toThrow();
       const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
 
@@ -161,58 +172,10 @@ describe('cache', () => {
         { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult')) },
       );
 
-      await workflow.cache();
+      await expect(workflow()).rejects.toThrow();
       const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
       expect(outString).not.toMatch(`POST ${createPRUrl}`);
     });
-  });
-});
-
-describe('status', () => {
-  const command = 'licensed';
-  const configFile = path.normalize(path.join(__dirname, '..', '..', '.licensed.yml'));
-
-  const branch = 'branch-licenses';
-  const parent = 'branch';
-
-  let outString;
-
-  beforeEach(() => {
-    process.env = {
-      ...process.env,
-      INPUT_COMMAND: command,
-      INPUT_CONFIG_FILE: configFile,
-      GITHUB_REF: `refs/heads/${parent}`,
-    };
-
-    outString = '';
-    mocks.exec.setLog(log => outString += log + os.EOL);
-    mocks.exec.mock([
-      { command: `${command} status`, exitCode: 0, stdout: 'status output' }
-    ]);
-
-    sinon.stub(console, 'log').callsFake(log => outString += log);
-    sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
-
-    Object.keys(utils).forEach(key => sinon.spy(utils, key));
-  });
-
-  afterEach(() => {
-    sinon.restore();
-    mocks.exec.restore();
-  });
-
-  it('runs licensed status', async () => {
-    await workflow.status();
-    expect(outString).toMatch(`${command} status -c ${configFile}`);
-    expect(utils.getLicensedInput.callCount).toEqual(1);
-    expect(utils.getBranch.callCount).toEqual(1);
-  });
-
-  it('returns information about the status call', async () => {
-    const result = await workflow.status();
-    expect(result.success).toEqual(true);
-    expect(result.log).toEqual('status output');
   });
 });
