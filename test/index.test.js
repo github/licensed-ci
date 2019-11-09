@@ -60,7 +60,7 @@ describe('licensed-ci', () => {
   });
 
   it('runs a licensed ci workflow', async () => {
-    options.mocks.exec.unshift({ command: 'licensed status', exitCode: 1 });
+    options.mocks.exec.unshift({ command: 'licensed status', exitCode: 1, count: 1 });
 
     const { out, status } = await run(action, options);
     expect(status).toEqual(core.ExitCode.Success);
@@ -70,12 +70,5 @@ describe('licensed-ci', () => {
     expect(out).toMatch(`${command} cache -c ${configFile}`);
     expect(out).toMatch('git add');
     expect(out).toMatch('git diff-index --quiet HEAD');
-  });
-
-  it('does not cache data if no changes are needed', async () => {
-    const { out, status } = await run(action, options);
-    expect(status).toEqual(core.ExitCode.Success);
-    expect(out).toMatch(`${command} status -c ${configFile}`);
-    expect(out).not.toMatch(`${command} cache -c ${configFile}`);
   });
 });

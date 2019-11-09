@@ -8,7 +8,7 @@ const workflow = require('../../lib/workflows/push');
 
 const octokit = new github.GitHub('token');
 
-describe('cache', () => {
+describe('push workflow', () => {
   const token = 'token';
   const userName = 'user';
   const userEmail = 'user@example.com';
@@ -46,6 +46,7 @@ describe('cache', () => {
 
     mocks.exec.mock([
       { command: 'licensed env', exitCode: 1 },
+      { command: 'licensed status', exitCode: 1, count: 1 },
       { command: '', exitCode: 0 }
     ]);
 
@@ -57,10 +58,17 @@ describe('cache', () => {
     mocks.exec.restore();
   });
 
+  it('does not cache data if no changes are needed', async () => {
+    mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
+    await workflow();
+    expect(outString).toMatch(`${command} status -c ${configFile}`);
+    expect(outString).not.toMatch(`${command} cache -c ${configFile}`);
+  });
+
   it('runs a licensed ci workflow', async () => {
-    await workflow.cache();
+    await workflow();
     expect(utils.getBranch.callCount).toEqual(1);
-    expect(utils.getLicensedInput.callCount).toEqual(1);
+    expect(utils.getLicensedInput.callCount).toBeGreaterThan(1);
     expect(utils.ensureBranch.withArgs(branch, branch).callCount).toEqual(1);
     expect(outString).toMatch(`git checkout ${branch}`);
     expect(outString).toMatch(`${command} cache -c ${configFile}`);
@@ -70,9 +78,14 @@ describe('cache', () => {
     expect(outString).toMatch('git diff-index --quiet HEAD -- .');
   });
 
+  it('fails if status checks fail after caching data', async () => {
+    mocks.exec.mock({ command: 'licensed status', exitCode: 1 });
+    await expect(workflow()).rejects.toThrow('Cached metadata checks failed');
+  });
+
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
-      await workflow.cache();
+      await workflow();
       expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`)
     });
   });
@@ -90,19 +103,19 @@ describe('cache', () => {
     it('raises an error when github_token is not given', async () => {
       delete process.env.INPUT_GITHUB_TOKEN;
 
-      await expect(workflow.cache()).rejects.toThrow(
+      await expect(workflow()).rejects.toThrow(
         'Input required and not supplied: github_token'
       );
     });
 
     it('pushes changes to origin', async () => {
-      await workflow.cache();
+      await workflow();
       expect(outString).toMatch(`git commit -m ${commitMessage}`);
       expect(outString).toMatch(`git push licensed-ci-origin ${branch}`)
     });
 
     it('does not comment if comment input is not given', async () => {
-      await workflow.cache();
+      await workflow();
       expect(outString).not.toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
@@ -115,7 +128,7 @@ describe('cache', () => {
         { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) }
       );
 
-      await workflow.cache();
+      await workflow();
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
@@ -129,56 +142,9 @@ describe('cache', () => {
         { method: 'POST', uri: createCommentUrl }
       ]);
 
-      await workflow.cache();
+      await workflow();
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).toMatch(`POST ${createCommentUrl} : ${JSON.stringify({ body: process.env.INPUT_PR_COMMENT})}`);
     });
-  });
-});
-
-describe('status', () => {
-  const command = 'licensed';
-  const configFile = path.normalize(path.join(__dirname, '..', '..', '.licensed.yml'));
-
-  const branch = 'branch-licenses';
-  const parent = 'branch';
-
-  let outString;
-
-  beforeEach(() => {
-    process.env = {
-      ...process.env,
-      INPUT_COMMAND: command,
-      INPUT_CONFIG_FILE: configFile,
-      GITHUB_REF: `refs/heads/${parent}`,
-    };
-
-    outString = '';
-    mocks.exec.setLog(log => outString += log + os.EOL);
-
-    sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
-
-    mocks.exec.mock([
-      { command: `${command} status`, exitCode: 0, stdout: 'status output' }
-    ]);
-
-    Object.keys(utils).forEach(key => sinon.spy(utils, key));
-  });
-
-  afterEach(() => {
-    sinon.restore();
-    mocks.exec.restore();
-  });
-
-  it('runs licensed status', async () => {
-    await workflow.status();
-    expect(outString).toMatch(`${command} status -c ${configFile}`);
-    expect(utils.getLicensedInput.callCount).toEqual(1);
-  });
-
-  it('returns information about the status call', async () => {
-    const result = await workflow.status();
-    expect(result.success).toEqual(true);
-    expect(result.log).toEqual('status output');
   });
 });
