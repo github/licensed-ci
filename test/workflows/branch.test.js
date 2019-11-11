@@ -167,13 +167,15 @@ describe('branch workflow', () => {
       expect(body.reviewers).toEqual([process.env.GITHUB_ACTOR]);
 
       // expect pr information set in output
-      expect(outString).toMatch(new RegExp(`.*set-output.*branch-pr-url.*${pullRequest.html_url}.*`));
-      expect(outString).toMatch(new RegExp(`.*set-output.*branch-pr-number.*${pullRequest.number}.*`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${pullRequest.html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${pullRequest.number}`));
+      expect(outString).toMatch(new RegExp('set-output.*pr_created'));
     });
 
     it('does not open a PR for changes if it exists', async () => {
+      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
       mocks.github.mock(
-        { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult')) },
+        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture },
       );
 
       await expect(workflow()).rejects.toThrow();
@@ -182,8 +184,9 @@ describe('branch workflow', () => {
       expect(outString).not.toMatch(`POST ${createPRUrl}`);
 
       // do not output any PR information if the PR already exists
-      expect(outString).not.toMatch(new RegExp('.*set-output.*branch-pr-url.*'));
-      expect(outString).not.toMatch(new RegExp('.*set-output.*branch-pr-number.*'));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${searchResultFixture.items[0].html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${searchResultFixture.items[0].number}`));
+      expect(outString).not.toMatch(new RegExp('set-output.*pr_created'));
     });
   });
 });

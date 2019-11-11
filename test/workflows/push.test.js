@@ -108,14 +108,24 @@ describe('push workflow', () => {
     });
 
     it('pushes changes to origin', async () => {
+      const searchResultFixture = path.join(__dirname, '..', 'fixtures', 'emptySearchResult');
+      mocks.github.mock(
+        { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) }
+      );
+
       await workflow();
       expect(outString).toMatch(`git commit -m ${commitMessage}`);
       expect(outString).toMatch(`git push licensed-ci-origin ${branch}`)
     });
 
     it('does not comment if comment input is not given', async () => {
+      const searchResultFixture = path.join(__dirname, '..', 'fixtures', 'emptySearchResult');
+      mocks.github.mock(
+        { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) }
+      );
+
       await workflow();
-      expect(outString).not.toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
 
@@ -144,6 +154,18 @@ describe('push workflow', () => {
       await workflow();
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).toMatch(`POST ${createCommentUrl} : ${JSON.stringify({ body: process.env.INPUT_PR_COMMENT})}`);
+    });
+
+    it('sets pr details in step output', async () => {
+      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
+      mocks.github.mock([
+        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture },
+        { method: 'POST', uri: createCommentUrl }
+      ]);
+
+      await workflow();
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${searchResultFixture.items[0].html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${searchResultFixture.items[0].number}`));
     });
   });
 });
