@@ -42,6 +42,11 @@ Notes:
   1. `push`
   1. `branch`
 
+### Outputs
+
+- pr_url - The html url of the pull request for the license updates branch, if available, to enable further actions scripting.
+- pr_number - The number of the pull request for the license updates branch, if available, to enable further actions scripting.
+
 ### Usage
 
 Basic usage with a licensed release package using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)

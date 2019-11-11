@@ -31,6 +31,11 @@ inputs:
     description: Which workflow to run when metadata is updated.  See README for more details.
     required: false
     default: push
+outputs:
+  pr_url:
+    description: The html url of the pull request containing license updates, if available.
+  pr_number:
+    description: The number of the pull request containing license updates, if available.
 branding:
   icon: check-circle
   color: green
