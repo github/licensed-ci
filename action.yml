@@ -25,7 +25,7 @@ inputs:
     required: false
     default: 'Auto-update license files'
   pr_comment:
-    description: 'Comment to add to a pull request, if one exists for the branch'
+    description: '(Deprecated) Comment to add to a pull request, if one exists for the branch'
     required: false
   workflow:
     description: Which workflow to run when metadata is updated.  See README for more details.
