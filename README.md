@@ -70,10 +70,22 @@ steps:
   with:
     ruby-version: 2.6.x
 - run: bundle install
-- uses: jonabc/licensed-ci@v1
+- id: licensed
+  uses: jonabc/licensed-ci@v1
   with:
     github_token: ${{ secrets.GITHUB_TOKEN }}
     command: 'bundle exec licensed' # or bin/licensed when using binstubs
+- uses: actions/github-script@0.2.0
+  if: success() && !!steps.licensed.outputs.pr_number
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    script: |
+      github.issues.createComment({
+        ...context.repo,
+        issue_number: ${{ steps.licensed.outputs.pr_number }}
+        body: 'My custom PR message'
+      })
+
 ```
 
 # License
