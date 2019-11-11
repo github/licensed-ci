@@ -41,7 +41,6 @@ describe('push workflow', () => {
     mocks.exec.setLog(log => outString += log + os.EOL);
     mocks.github.setLog(log => outString += log + os.EOL);
 
-    sinon.stub(console, 'log').callsFake(log => outString += log + os.EOL);
     sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
 
     mocks.exec.mock([
