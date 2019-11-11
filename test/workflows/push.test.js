@@ -145,5 +145,17 @@ describe('push workflow', () => {
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).toMatch(`POST ${createCommentUrl} : ${JSON.stringify({ body: process.env.INPUT_PR_COMMENT})}`);
     });
+
+    it('sets pr details in step output', async () => {
+      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
+      mocks.github.mock([
+        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture },
+        { method: 'POST', uri: createCommentUrl }
+      ]);
+
+      await workflow();
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${searchResultFixture.items[0].html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${searchResultFixture.items[0].number}`));
+    });
   });
 });
