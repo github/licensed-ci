@@ -18,11 +18,11 @@ If `pr_comment` input is set and a pull request is available, a comment is added
 
 #### Branch (`branch`)
 
-Update cached dependency metadata on a branch named `<branch>/licenses` and opens a pull request to merge the changes into the target branch.
+Update cached dependency metadata on a branch named `<branch>-licenses` and opens a pull request to merge the changes into the target branch.
 If `pr_comment` input is set, it will be added to the body text when creating the pull request.  This input is deprecated and will be removed in the next major version.
 
 Manual adjustments to license data or the github/licensed configuration should happen on the new licenses branch.
-Any runs of the action on a `.../licenses` branch will run status checks only - dependency metadata will not be updated.
+Any runs of the action on a `*-licenses` branch will run status checks only - dependency metadata will not be updated.
 
 Notes:
 - If the licenses branch already exists, it is rebased onto the target branch before caching metadata.
