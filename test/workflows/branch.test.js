@@ -135,13 +135,14 @@ describe('branch workflow', () => {
 
     it('opens a PR for changes', async () => {
       process.env.INPUT_PR_COMMENT = 'pr_comment';
+      const pullRequest = require(path.join(__dirname, '..', 'fixtures', 'pullRequest'));
       mocks.exec.mock([
         { command: 'licensed status', exitCode: 1, count: 1 },
         { command: 'licensed status', exitCode: 0, stdout: 'licenses-success' }
       ]);
       mocks.github.mock([
         { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult')) },
-        { method: 'POST', uri: createPRUrl, response: require(path.join(__dirname, '..', 'fixtures', 'pullRequest')) },
+        { method: 'POST', uri: createPRUrl, response: pullRequest },
         { method: 'POST', url: createReviewRequestUrl }
       ]);
 
@@ -165,6 +166,10 @@ describe('branch workflow', () => {
       expect(match).toBeTruthy();
       body = JSON.parse(match[1]);
       expect(body.reviewers).toEqual([process.env.GITHUB_ACTOR]);
+
+      // expect pr information set in output
+      expect(outString).toMatch(new RegExp(`.*set-output.*branch-pr-url.*${pullRequest.html_url}.*`));
+      expect(outString).toMatch(new RegExp(`.*set-output.*branch-pr-number.*${pullRequest.number}.*`));
     });
 
     it('does not open a PR for changes if it exists', async () => {
@@ -176,6 +181,10 @@ describe('branch workflow', () => {
       const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
       expect(outString).not.toMatch(`POST ${createPRUrl}`);
+
+      // do not output any PR information if the PR already exists
+      expect(outString).not.toMatch(new RegExp('.*set-output.*branch-pr-url.*'));
+      expect(outString).not.toMatch(new RegExp('.*set-output.*branch-pr-number.*'));
     });
   });
 });
