@@ -14,8 +14,13 @@ jobs:
     - uses: jonabc/setup-licensed@v1
       with:
         version: '2.x'
-    - uses: ./
+    - id: licensed
+      uses: ./
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         config_file: .licensed.release.yml
         workflow: branch
+    - if: failed()
+      env:
+        STEPS_CONTEXT: ${{ toJson(steps) }}
+      run: echo "$STEPS_CONTEXT"
