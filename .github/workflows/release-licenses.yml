@@ -20,7 +20,7 @@ jobs:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         config_file: .licensed.release.yml
         workflow: branch
-    - if: failed()
+    - if: failure()
       env:
         STEPS_CONTEXT: ${{ toJson(steps) }}
       run: echo "$STEPS_CONTEXT"
