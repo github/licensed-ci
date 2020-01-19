@@ -25,7 +25,7 @@ inputs:
     required: false
     default: 'Auto-update license files'
   pr_comment:
-    description: 'Comment to add to a pull request, if one exists for the branch'
+    description: '(Deprecated) Comment to add to a pull request, if one exists for the branch'
     required: false
   workflow:
     description: Which workflow to run when metadata is updated.  See README for more details.
@@ -36,6 +36,12 @@ outputs:
     description: The branch containing licensed-ci changes.
   user_branch:
     description: The branch containing user changes.
+  pr_url:
+    description: The html url of the pull request containing license updates, if available.
+  pr_number:
+    description: The number of the pull request containing license updates, if available.
+  pr_created:
+    description: True if a pull request was created in a `branch` workflow, false otherwise.
 branding:
   icon: check-circle
   color: green
