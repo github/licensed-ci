@@ -183,7 +183,7 @@ describe('ensureBranch', () => {
 
   beforeEach(() => {
     outString = '';
-    mocks.exec.setLog(log => outString += log);
+    mocks.exec.setLog(log => outString += log + os.EOL);
     mocks.exec.mock({ command: '', exitCode: 0 });
   })
 
