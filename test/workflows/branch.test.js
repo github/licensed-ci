@@ -79,6 +79,10 @@ describe('branch workflow', () => {
     expect(outString).toMatch('git add -- .');
     expect(outString).toMatch('git diff-index --quiet HEAD -- .');
     expect(outString).toMatch(`git checkout ${parent}`);
+
+    // expect branch information set in output
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
   it('does not cache metadata on licenses branch', async () => {

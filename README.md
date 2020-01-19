@@ -41,6 +41,10 @@ Notes:
   1. `push`
   1. `branch`
 
+### Outputs
+
+- licenses_branch - The branch containing licensed-ci changes.
+- user_branch - The branch containing user changes.
 ### Usage
 
 Basic usage with a licensed release package using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)

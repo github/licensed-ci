@@ -75,11 +75,19 @@ describe('push workflow', () => {
     expect(outString).toMatch(`${command} env`);
     expect(outString).toMatch('git add -- .');
     expect(outString).toMatch('git diff-index --quiet HEAD -- .');
+
+    // expect branch information set in output
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
   it('fails if status checks fail after caching data', async () => {
     mocks.exec.mock({ command: 'licensed status', exitCode: 1 });
     await expect(workflow()).rejects.toThrow('Cached metadata checks failed');
+
+    // expect branch information set in output
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
   describe('with no cached file changes', () => {

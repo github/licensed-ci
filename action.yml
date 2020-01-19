@@ -31,6 +31,11 @@ inputs:
     description: Which workflow to run when metadata is updated.  See README for more details.
     required: false
     default: push
+outputs:
+  licenses_branch:
+    description: The branch containing licensed-ci changes.
+  user_branch:
+    description: The branch containing user changes.
 branding:
   icon: check-circle
   color: green
