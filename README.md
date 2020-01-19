@@ -46,6 +46,7 @@ Notes:
 
 - licenses_branch - The branch containing licensed-ci changes.
 - user_branch - The branch containing user changes.
+- licenses_updated - A boolean string indicating whether license files were updated.
 - pr_url - The html url of the pull request for the license updates branch, if available, to enable further actions scripting.
 - pr_number - The number of the pull request for the license updates branch, if available, to enable further actions scripting.
 - pr_created - True if a pull request was created in a `branch` workflow, false otherwise.

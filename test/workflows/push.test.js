@@ -101,7 +101,8 @@ describe('push workflow', () => {
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await workflow();
-      expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`)
+      expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`);
+      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*false`));
     });
   });
 
@@ -129,7 +130,8 @@ describe('push workflow', () => {
 
       await workflow();
       expect(outString).toMatch(`git commit -m ${commitMessage}`);
-      expect(outString).toMatch(`git push licensed-ci-origin ${branch}`)
+      expect(outString).toMatch(`git push licensed-ci-origin ${branch}`);
+      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*true`));
     });
 
     it('does not comment if comment input is not given', async () => {

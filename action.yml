@@ -36,6 +36,8 @@ outputs:
     description: The branch containing licensed-ci changes.
   user_branch:
     description: The branch containing user changes.
+  licenses_updated:
+    description: A boolean string indicating whether license files were updated.
   pr_url:
     description: The html url of the pull request containing license updates, if available.
   pr_number:
