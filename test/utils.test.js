@@ -53,7 +53,7 @@ describe('configureGit', () => {
   it('configures the licensed-ci-origin remote', async () => {
     await utils.configureGit();
     expect(outString).toMatch(
-      `git remote add licensed-ci-origin https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`
+      `git remote add ${utils.getOrigin()} https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`
     );
   });
 });
