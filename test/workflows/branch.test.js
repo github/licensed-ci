@@ -26,6 +26,10 @@ describe('branch workflow', () => {
   let outString;
   const processEnv = process.env;
 
+  const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
+  const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
+  const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
+
   beforeEach(() => {
     process.env = {
       ...process.env,
@@ -51,6 +55,10 @@ describe('branch workflow', () => {
       { command: 'licensed status', exitCode: 1 },
       { command: '', exitCode: 0 }
     ]);
+
+    mocks.github.mock(
+      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
+    );
 
     Object.keys(utils).forEach(key => sinon.spy(utils, key));
   });
@@ -79,6 +87,10 @@ describe('branch workflow', () => {
     expect(outString).toMatch('git add -- .');
     expect(outString).toMatch('git diff-index --quiet HEAD -- .');
     expect(outString).toMatch(`git checkout ${parent}`);
+
+    // expect branch information set in output
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
   it('does not cache metadata on licenses branch', async () => {
@@ -97,13 +109,12 @@ describe('branch workflow', () => {
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
-      expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`)
+      expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`);
+      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*false`));
     });
   });
 
   describe('with cached file changes', () => {
-    const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
-    const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
     const createPREndpoint = octokit.pulls.create.endpoint({ owner, repo });
     const createPRUrl = createPREndpoint.url.replace('https://api.github.com', '');
     const createReviewRequestEndpoint = octokit.pulls.createReviewRequest.endpoint({ owner, repo, pull_number: 1347 /* from fixture */ });
@@ -111,11 +122,6 @@ describe('branch workflow', () => {
 
     beforeEach(() => {
       mocks.exec.mock({ command: 'git diff-index', exitCode: 1 });
-      mocks.github.mock({
-        method: 'GET',
-        uri: issuesSearchUrl,
-        response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'))
-      });
     });
 
     it('raises an error when github_token is not given', async () => {
@@ -129,7 +135,8 @@ describe('branch workflow', () => {
     it('pushes changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
       expect(outString).toMatch(`git commit -m ${commitMessage}`);
-      expect(outString).toMatch(`git push licensed-ci-origin ${branch}`)
+      expect(outString).toMatch(`git push licensed-ci-origin ${branch}`);
+      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*true`));
     });
 
     it('opens a PR for changes', async () => {
@@ -167,23 +174,21 @@ describe('branch workflow', () => {
       expect(body.reviewers).toEqual([process.env.GITHUB_ACTOR]);
 
       // expect pr information set in output
-      expect(outString).toMatch(new RegExp(`.*set-output.*branch-pr-url.*${pullRequest.html_url}.*`));
-      expect(outString).toMatch(new RegExp(`.*set-output.*branch-pr-number.*${pullRequest.number}.*`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${pullRequest.html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${pullRequest.number}`));
+      expect(outString).toMatch(new RegExp('set-output.*pr_created.*true'));
     });
 
     it('does not open a PR for changes if it exists', async () => {
-      mocks.github.mock(
-        { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult')) },
-      );
-
       await expect(workflow()).rejects.toThrow();
       const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
       expect(outString).not.toMatch(`POST ${createPRUrl}`);
 
-      // do not output any PR information if the PR already exists
-      expect(outString).not.toMatch(new RegExp('.*set-output.*branch-pr-url.*'));
-      expect(outString).not.toMatch(new RegExp('.*set-output.*branch-pr-number.*'));
+      // expect pr information set in output
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${searchResultFixture.items[0].html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${searchResultFixture.items[0].number}`));
+      expect(outString).toMatch(new RegExp('set-output.*pr_created.*false'));
     });
   });
 });
