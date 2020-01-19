@@ -1,7 +1,10 @@
+const github = require('@actions/github');
 const { mocks } = require('@jonabc/actions-mocks');
 const path = require('path');
 const os = require('os');
 const utils = require('../lib/utils');
+
+const octokit = new github.GitHub('token');
 
 describe('configureGit', () => {
   let outString;
@@ -248,5 +251,44 @@ describe('ensureBranch', () => {
       await utils.ensureBranch(branch, branch);
       expect(outString).not.toMatch(`git rebase ${branch} ${branch}`);
     });
+  });
+});
+
+describe('findPullRequest', () => {
+  const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
+  const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
+  const searchResultFixture = require(path.join(__dirname, 'fixtures', 'testSearchResult'));
+  const head = 'head';
+  const base = 'base';
+
+  let outString;
+
+  beforeEach(() => {
+    outString = '';
+    mocks.github.setLog(log => outString += log + os.EOL);
+    mocks.github.mock(
+      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
+    );
+  })
+
+  afterEach(() => {
+    mocks.github.restore();
+  });
+
+  it('finds a pull request for a head and base branch', async () => {
+    const pullRequest = await utils.findPullRequest(octokit, head, base);
+    expect(pullRequest).toEqual(searchResultFixture.items[0]);
+    const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${head} base:${base}`;
+    expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+  });
+
+  it('finds a pull request for a head branch', async () => {
+    const pullRequest = await utils.findPullRequest(octokit, head);
+    expect(pullRequest).toEqual(searchResultFixture.items[0]);
+    let query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${head}`;
+    expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+
+    query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${head} base:${base}`;
+    expect(outString).not.toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
   });
 });

@@ -153,7 +153,7 @@ describe('branch workflow', () => {
       ]);
 
       await expect(workflow()).rejects.toThrow();
-      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
+      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`;
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
 
       let match = outString.match(`POST ${createPRUrl} : (.+)`);
