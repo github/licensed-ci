@@ -20,12 +20,13 @@ describe('push workflow', () => {
 
   // to match the response from the testSearchResult.json fixture
   const owner = 'jonabc';
-  const repo = 'repo';
+  const repo = 'setup-licensed';
 
   const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
   const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
   const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
 
+  const processEnv = process.env;
   let outString;
 
   beforeEach(() => {
@@ -63,6 +64,7 @@ describe('push workflow', () => {
   afterEach(() => {
     sinon.restore();
     mocks.exec.restore();
+    process.env = processEnv;
   });
 
   it('does not cache data if no changes are needed', async () => {
