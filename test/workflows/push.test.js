@@ -20,12 +20,13 @@ describe('push workflow', () => {
 
   // to match the response from the testSearchResult.json fixture
   const owner = 'jonabc';
-  const repo = 'repo';
+  const repo = 'setup-licensed';
 
   const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
   const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
   const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
 
+  const processEnv = process.env;
   let outString;
 
   beforeEach(() => {
@@ -63,6 +64,7 @@ describe('push workflow', () => {
   afterEach(() => {
     sinon.restore();
     mocks.exec.restore();
+    process.env = processEnv;
   });
 
   it('does not cache data if no changes are needed', async () => {
@@ -101,7 +103,7 @@ describe('push workflow', () => {
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await workflow();
-      expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`);
+      expect(outString).not.toMatch(`git push ${utils.getOrigin()} ${branch}`);
       expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*false`));
     });
   });
@@ -130,7 +132,7 @@ describe('push workflow', () => {
 
       await workflow();
       expect(outString).toMatch(`git commit -m ${commitMessage}`);
-      expect(outString).toMatch(`git push licensed-ci-origin ${branch}`);
+      expect(outString).toMatch(`git push ${utils.getOrigin()} ${branch}`);
       expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*true`));
     });
 
@@ -141,7 +143,7 @@ describe('push workflow', () => {
       );
 
       await workflow();
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
 
@@ -154,7 +156,7 @@ describe('push workflow', () => {
       );
 
       await workflow();
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
 
@@ -164,7 +166,7 @@ describe('push workflow', () => {
       mocks.github.mock({ method: 'POST', uri: createCommentUrl });
 
       await workflow();
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).toMatch(`POST ${createCommentUrl} : ${JSON.stringify({ body: process.env.INPUT_PR_COMMENT})}`);
     });
 

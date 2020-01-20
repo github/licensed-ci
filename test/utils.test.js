@@ -1,7 +1,10 @@
+const github = require('@actions/github');
 const { mocks } = require('@jonabc/actions-mocks');
 const path = require('path');
 const os = require('os');
 const utils = require('../lib/utils');
+
+const octokit = new github.GitHub('token');
 
 describe('configureGit', () => {
   let outString;
@@ -53,7 +56,7 @@ describe('configureGit', () => {
   it('configures the licensed-ci-origin remote', async () => {
     await utils.configureGit();
     expect(outString).toMatch(
-      `git remote add licensed-ci-origin https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`
+      `git remote add ${utils.getOrigin()} https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`
     );
   });
 });
@@ -248,5 +251,131 @@ describe('ensureBranch', () => {
       await utils.ensureBranch(branch, branch);
       expect(outString).not.toMatch(`git rebase ${branch} ${branch}`);
     });
+  });
+});
+
+describe('findPullRequest', () => {
+  const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
+  const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
+  const searchResultFixture = require(path.join(__dirname, 'fixtures', 'testSearchResult'));
+  const head = 'head';
+  const base = 'base';
+
+  let outString;
+
+  beforeEach(() => {
+    outString = '';
+    mocks.github.setLog(log => outString += log + os.EOL);
+    mocks.github.mock(
+      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
+    );
+  })
+
+  afterEach(() => {
+    mocks.github.restore();
+  });
+
+  it('finds a pull request for a head and base branch', async () => {
+    const pullRequest = await utils.findPullRequest(octokit, head, base);
+    expect(pullRequest).toEqual(searchResultFixture.items[0]);
+    const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${head} base:${base}`;
+    expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+  });
+
+  it('finds a pull request for a head branch', async () => {
+    const pullRequest = await utils.findPullRequest(octokit, head);
+    expect(pullRequest).toEqual(searchResultFixture.items[0]);
+    let query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${head}`;
+    expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+
+    query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${head} base:${base}`;
+    expect(outString).not.toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+  });
+});
+
+describe('closePullRequest', () => {
+  const pullRequest = require(path.join(__dirname, 'fixtures', 'pullRequest'));
+  const closedPullRequest = { ...pullRequest, state: 'closed' };
+
+  // to match the response from the pullRequest.json fixture
+  const owner = 'octocat';
+  const repo = 'Hellow-World';
+
+  const updatePullsEndpoint = octokit.pulls.update.endpoint({ owner, repo, pull_number: pullRequest.number });
+  const updatePullsUrl = updatePullsEndpoint.url.replace('https://api.github.com', '');
+
+  const processEnv = process.env;
+  let outString;
+
+  beforeEach(() => {
+    process.env = {
+      ...process.env,
+      GITHUB_REPOSITORY: `${owner}/${repo}`
+    };
+
+    outString = '';
+    mocks.github.setLog(log => outString += log + os.EOL);
+    mocks.github.mock(
+      { method: 'PATCH', uri: updatePullsUrl, response: closedPullRequest }
+    );
+  })
+
+  afterEach(() => {
+    mocks.github.restore();
+    process.env = processEnv;
+  });
+
+  it('closes an open pull request', async () => {
+    const response = await utils.closePullRequest(octokit, pullRequest);
+    expect(response).toEqual(closedPullRequest);
+    expect(outString).toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+  });
+
+  it('does not close an already closed pull request', async () => {
+    const response = await utils.closePullRequest(octokit, closedPullRequest);
+    expect(response).toEqual(closedPullRequest);
+    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+  });
+
+  it('handles a null pull request input', async () => {
+    const response = await utils.closePullRequest(octokit, null);
+    expect(response).toBeNull();
+    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+  });
+});
+
+describe('deleteBranch', () => {
+  const branch = 'branch';
+  let outString;
+
+  beforeEach(() => {
+    outString = '';
+    mocks.exec.setLog(log => outString += log + os.EOL);
+    // console.log = log => outString += log;
+    mocks.exec.mock({ command: '', exitCode: 0 });
+  })
+
+  afterEach(() => {
+    mocks.exec.restore();
+  });
+
+  it('deletes a git branch', async () => {
+    await utils.deleteBranch(branch);
+    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
+    expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+  });
+
+  it('does not try to delete a branch that doesn\'t exist', async () => {
+    mocks.exec.mock({ command: 'git ls-remote', exitCode: 2 });
+    await utils.deleteBranch(branch);
+    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
+    expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+  });
+
+  it('raises an error if branch delete fails', async () => {
+    mocks.exec.mock({ command: 'git push', exitCode: 2 });
+    await expect(utils.deleteBranch(branch)).rejects.toThrow();
+    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
+    expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 });
