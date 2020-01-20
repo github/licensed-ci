@@ -115,10 +115,17 @@ describe('branch workflow', () => {
   it('cleans pull requests if status checks succeed', async () => {
     mocks.exec.mock([
       { command: 'licensed status', exitCode: 0 },
+      { command: 'git show-ref', exitCode: 0 },
+      { command: 'git push', exitCode: 0 }
+    ]);
+
     await workflow();
 
     expect(utils.closePullRequest.callCount).toEqual(1);
     expect(outString).toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(utils.deleteBranch.callCount).toEqual(1);
+    expect(outString).toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 
   describe('with no cached file changes', () => {
