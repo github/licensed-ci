@@ -28,7 +28,7 @@
     "@actions/io": "^1.0.1"
   },
   "devDependencies": {
-    "@jonabc/actions-mocks": "^1.1.0",
+    "@jonabc/actions-mocks": "^1.1.1",
     "acorn": "^6.3.0",
     "eslint": "^6.3.0",
     "jest": "^24.9.0",
