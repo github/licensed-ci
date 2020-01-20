@@ -21,10 +21,19 @@ describe('branch workflow', () => {
 
   // to match the response from the testSearchResult.json fixture
   const owner = 'jonabc';
-  const repo = 'repo';
+  const repo = 'setup-licensed';
 
   let outString;
   const processEnv = process.env;
+
+  const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
+  const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
+  const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
+
+  const pullRequest = searchResultFixture.items[0];
+  const closedPullRequest = { ...pullRequest, state: 'closed' };
+  const updatePullsEndpoint = octokit.pulls.update.endpoint({ owner, repo, pull_number: pullRequest.number });
+  const updatePullsUrl = updatePullsEndpoint.url.replace('https://api.github.com', '');
 
   beforeEach(() => {
     process.env = {
@@ -35,6 +44,7 @@ describe('branch workflow', () => {
       INPUT_USER_EMAIL: userEmail,
       INPUT_COMMAND: command,
       INPUT_CONFIG_FILE: configFile,
+      INPUT_CLEANUP_ON_SUCCESS: 'false',
       GITHUB_REF: `refs/heads/${parent}`,
       GITHUB_REPOSITORY: `${owner}/${repo}`,
       GITHUB_ACTOR: 'actor'
@@ -44,13 +54,17 @@ describe('branch workflow', () => {
     mocks.exec.setLog(log => outString += log + os.EOL);
     mocks.github.setLog(log => outString += log + os.EOL);
 
-    sinon.stub(console, 'log').callsFake(log => outString += log + os.EOL);
     sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
 
     mocks.exec.mock([
       { command: 'licensed env', exitCode: 1 },
       { command: 'licensed status', exitCode: 1 },
       { command: '', exitCode: 0 }
+    ]);
+
+    mocks.github.mock([
+      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture },
+      { method: 'PATCH', uri: updatePullsUrl, response: closedPullRequest }
     ]);
 
     Object.keys(utils).forEach(key => sinon.spy(utils, key));
@@ -80,6 +94,10 @@ describe('branch workflow', () => {
     expect(outString).toMatch('git add -- .');
     expect(outString).toMatch('git diff-index --quiet HEAD -- .');
     expect(outString).toMatch(`git checkout ${parent}`);
+
+    // expect branch information set in output
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
   it('does not cache metadata on licenses branch', async () => {
@@ -95,16 +113,58 @@ describe('branch workflow', () => {
     expect(outString).not.toMatch('git diff-index --quiet HEAD -- .');
   });
 
+  it('cleans pull request and branch if status checks succeed on parent', async () => {
+    process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
+    mocks.exec.mock([
+      { command: 'licensed status', exitCode: 0 },
+      { command: 'git ls-remote', exitCode: 0 },
+      { command: 'git push', exitCode: 0 }
+    ]);
+
+    await workflow();
+
+    expect(utils.closePullRequest.callCount).toEqual(1);
+    expect(outString).toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(utils.deleteBranch.callCount).toEqual(1);
+    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
+    expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+  });
+
+  it('does not cleanup if flag input is not true', async () => {
+    mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
+
+    await workflow();
+
+    expect(utils.closePullRequest.callCount).toEqual(0);
+    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(utils.deleteBranch.callCount).toEqual(0);
+    expect(outString).not.toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
+    expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+  });
+
+  it('does not clean pull request and branch if status check succeeds on licenses branch', async () => {
+    process.env.GITHUB_REF = `refs/heads/${branch}`;
+    process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
+    mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
+
+    await workflow();
+
+    expect(utils.closePullRequest.callCount).toEqual(0);
+    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(utils.deleteBranch.callCount).toEqual(0);
+    expect(outString).not.toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
+    expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+  });
+
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
-      expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`)
+      expect(outString).not.toMatch(`git push ${utils.getOrigin()} ${branch}`);
+      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*false`));
     });
   });
 
   describe('with cached file changes', () => {
-    const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
-    const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
     const createPREndpoint = octokit.pulls.create.endpoint({ owner, repo });
     const createPRUrl = createPREndpoint.url.replace('https://api.github.com', '');
     const createReviewRequestEndpoint = octokit.pulls.createReviewRequest.endpoint({ owner, repo, pull_number: 1347 /* from fixture */ });
@@ -112,11 +172,6 @@ describe('branch workflow', () => {
 
     beforeEach(() => {
       mocks.exec.mock({ command: 'git diff-index', exitCode: 1 });
-      mocks.github.mock({
-        method: 'GET',
-        uri: issuesSearchUrl,
-        response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'))
-      });
     });
 
     it('raises an error when github_token is not given', async () => {
@@ -130,23 +185,25 @@ describe('branch workflow', () => {
     it('pushes changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
       expect(outString).toMatch(`git commit -m ${commitMessage}`);
-      expect(outString).toMatch(`git push licensed-ci-origin ${branch}`)
+      expect(outString).toMatch(`git push ${utils.getOrigin()} ${branch}`);
+      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*true`));
     });
 
     it('opens a PR for changes', async () => {
       process.env.INPUT_PR_COMMENT = 'pr_comment';
+      const pullRequest = require(path.join(__dirname, '..', 'fixtures', 'pullRequest'));
       mocks.exec.mock([
         { command: 'licensed status', exitCode: 1, count: 1 },
         { command: 'licensed status', exitCode: 0, stdout: 'licenses-success' }
       ]);
       mocks.github.mock([
         { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult')) },
-        { method: 'POST', uri: createPRUrl, response: require(path.join(__dirname, '..', 'fixtures', 'pullRequest')) },
+        { method: 'POST', uri: createPRUrl, response: pullRequest },
         { method: 'POST', url: createReviewRequestUrl }
       ]);
 
       await expect(workflow()).rejects.toThrow();
-      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
+      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`;
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
 
       let match = outString.match(`POST ${createPRUrl} : (.+)`);
@@ -165,17 +222,23 @@ describe('branch workflow', () => {
       expect(match).toBeTruthy();
       body = JSON.parse(match[1]);
       expect(body.reviewers).toEqual([process.env.GITHUB_ACTOR]);
+
+      // expect pr information set in output
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${pullRequest.html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${pullRequest.number}`));
+      expect(outString).toMatch(new RegExp('set-output.*pr_created.*true'));
     });
 
     it('does not open a PR for changes if it exists', async () => {
-      mocks.github.mock(
-        { method: 'GET', uri: issuesSearchUrl, response: require(path.join(__dirname, '..', 'fixtures', 'testSearchResult')) },
-      );
-
       await expect(workflow()).rejects.toThrow();
       const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
       expect(outString).not.toMatch(`POST ${createPRUrl}`);
+
+      // expect pr information set in output
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${searchResultFixture.items[0].html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${searchResultFixture.items[0].number}`));
+      expect(outString).toMatch(new RegExp('set-output.*pr_created.*false'));
     });
   });
 });

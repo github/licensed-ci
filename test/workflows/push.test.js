@@ -20,8 +20,13 @@ describe('push workflow', () => {
 
   // to match the response from the testSearchResult.json fixture
   const owner = 'jonabc';
-  const repo = 'repo';
+  const repo = 'setup-licensed';
 
+  const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
+  const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
+  const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
+
+  const processEnv = process.env;
   let outString;
 
   beforeEach(() => {
@@ -41,7 +46,6 @@ describe('push workflow', () => {
     mocks.exec.setLog(log => outString += log + os.EOL);
     mocks.github.setLog(log => outString += log + os.EOL);
 
-    sinon.stub(console, 'log').callsFake(log => outString += log + os.EOL);
     sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
 
     mocks.exec.mock([
@@ -50,12 +54,17 @@ describe('push workflow', () => {
       { command: '', exitCode: 0 }
     ]);
 
+    mocks.github.mock(
+      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
+    );
+
     Object.keys(utils).forEach(key => sinon.spy(utils, key));
   });
 
   afterEach(() => {
     sinon.restore();
     mocks.exec.restore();
+    process.env = processEnv;
   });
 
   it('does not cache data if no changes are needed', async () => {
@@ -76,23 +85,30 @@ describe('push workflow', () => {
     expect(outString).toMatch(`${command} env`);
     expect(outString).toMatch('git add -- .');
     expect(outString).toMatch('git diff-index --quiet HEAD -- .');
+
+    // expect branch information set in output
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
   it('fails if status checks fail after caching data', async () => {
     mocks.exec.mock({ command: 'licensed status', exitCode: 1 });
     await expect(workflow()).rejects.toThrow('Cached metadata checks failed');
+
+    // expect branch information set in output
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await workflow();
-      expect(outString).not.toMatch(`git push licensed-ci-origin ${branch}`)
+      expect(outString).not.toMatch(`git push ${utils.getOrigin()} ${branch}`);
+      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*false`));
     });
   });
 
   describe('with cached file changes', () => {
-    const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
-    const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
     const createCommentEndpoint = octokit.issues.createComment.endpoint({ owner, repo, issue_number: 1 });
     const createCommentUrl = createCommentEndpoint.url.replace('https://api.github.com', '');
 
@@ -109,42 +125,59 @@ describe('push workflow', () => {
     });
 
     it('pushes changes to origin', async () => {
+      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult'));
+      mocks.github.mock(
+        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
+      );
+
       await workflow();
       expect(outString).toMatch(`git commit -m ${commitMessage}`);
-      expect(outString).toMatch(`git push licensed-ci-origin ${branch}`)
+      expect(outString).toMatch(`git push ${utils.getOrigin()} ${branch}`);
+      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*true`));
     });
 
     it('does not comment if comment input is not given', async () => {
+      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult'));
+      mocks.github.mock(
+        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
+      );
+
       await workflow();
-      expect(outString).not.toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
 
     it('does not comment if PR is not found', async () => {
       process.env.INPUT_PR_COMMENT = 'Auto updated files';
 
-      const searchResultFixture = path.join(__dirname, '..', 'fixtures', 'emptySearchResult');
+      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult'));
       mocks.github.mock(
-        { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) }
+        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
       );
 
       await workflow();
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
 
     it('comments if input is given and PR is open', async () => {
       process.env.INPUT_PR_COMMENT = 'Auto updated files';
 
-      const searchResultFixture = path.join(__dirname, '..', 'fixtures', 'testSearchResult');
+      mocks.github.mock({ method: 'POST', uri: createCommentUrl });
+
+      await workflow();
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      expect(outString).toMatch(`POST ${createCommentUrl} : ${JSON.stringify({ body: process.env.INPUT_PR_COMMENT})}`);
+    });
+
+    it('sets pr details in step output', async () => {
       mocks.github.mock([
-        { method: 'GET', uri: issuesSearchUrl, response: require(searchResultFixture) },
         { method: 'POST', uri: createCommentUrl }
       ]);
 
       await workflow();
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
-      expect(outString).toMatch(`POST ${createCommentUrl} : ${JSON.stringify({ body: process.env.INPUT_PR_COMMENT})}`);
+      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${searchResultFixture.items[0].html_url}`));
+      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${searchResultFixture.items[0].number}`));
     });
   });
 });

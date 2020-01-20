@@ -37,6 +37,9 @@ describe('licensed-ci', () => {
       mocks: {
         exec: [
           { command: '', exitCode: 0 }
+        ],
+        github: [
+          { method: 'GET', uri: '', responseCode: 200 }
         ]
       }
     };
