@@ -44,6 +44,7 @@ describe('branch workflow', () => {
       INPUT_USER_EMAIL: userEmail,
       INPUT_COMMAND: command,
       INPUT_CONFIG_FILE: configFile,
+      INPUT_CLEANUP_ON_SUCCESS: 'false',
       GITHUB_REF: `refs/heads/${parent}`,
       GITHUB_REPOSITORY: `${owner}/${repo}`,
       GITHUB_ACTOR: 'actor'
@@ -113,6 +114,7 @@ describe('branch workflow', () => {
   });
 
   it('cleans pull requests if status checks succeed', async () => {
+    process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
     mocks.exec.mock([
       { command: 'licensed status', exitCode: 0 },
       { command: 'git show-ref', exitCode: 0 },
@@ -126,6 +128,18 @@ describe('branch workflow', () => {
     expect(utils.deleteBranch.callCount).toEqual(1);
     expect(outString).toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
     expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+  });
+
+  it('does not cleanup if flag input is not true', async () => {
+    mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
+
+    await workflow();
+
+    expect(utils.closePullRequest.callCount).toEqual(0);
+    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(utils.deleteBranch.callCount).toEqual(0);
+    expect(outString).not.toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 
   describe('with no cached file changes', () => {

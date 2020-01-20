@@ -41,6 +41,7 @@ Notes:
 - `workflow` - Optional, default: `push`.  Specifies the workflow that is run when metadata updates are found:
   1. `push`
   1. `branch`
+- `cleanup_on_success` - Optional, default: `'false'`.  Only applies to the `branch` workflow.  Set to the string `'true'` to close PRs and delete branches used by the `branch` workflow when `licensed status` succeeds on the parent branch.
 
 ### Outputs
 
