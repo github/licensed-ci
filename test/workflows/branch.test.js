@@ -113,7 +113,7 @@ describe('branch workflow', () => {
     expect(outString).not.toMatch('git diff-index --quiet HEAD -- .');
   });
 
-  it('cleans pull requests if status checks succeed', async () => {
+  it('cleans pull request and branch if status checks succeed on parent', async () => {
     process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
     mocks.exec.mock([
       { command: 'licensed status', exitCode: 0 },
@@ -131,6 +131,20 @@ describe('branch workflow', () => {
   });
 
   it('does not cleanup if flag input is not true', async () => {
+    mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
+
+    await workflow();
+
+    expect(utils.closePullRequest.callCount).toEqual(0);
+    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(utils.deleteBranch.callCount).toEqual(0);
+    expect(outString).not.toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+  });
+
+  it('does not clean pull request and branch if status check succeeds on licenses branch', async () => {
+    process.env.GITHUB_REF = `refs/heads/${branch}`;
+    process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
     mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
 
     await workflow();
