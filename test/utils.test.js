@@ -361,21 +361,21 @@ describe('deleteBranch', () => {
 
   it('deletes a git branch', async () => {
     await utils.deleteBranch(branch);
-    expect(outString).toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
     expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 
   it('does not try to delete a branch that doesn\'t exist', async () => {
-    mocks.exec.mock({ command: 'git show-ref', exitCode: 2 });
+    mocks.exec.mock({ command: 'git ls-remote', exitCode: 2 });
     await utils.deleteBranch(branch);
-    expect(outString).toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
     expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 
   it('raises an error if branch delete fails', async () => {
     mocks.exec.mock({ command: 'git push', exitCode: 2 });
     await expect(utils.deleteBranch(branch)).rejects.toThrow();
-    expect(outString).toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
     expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 });

@@ -117,7 +117,7 @@ describe('branch workflow', () => {
     process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
     mocks.exec.mock([
       { command: 'licensed status', exitCode: 0 },
-      { command: 'git show-ref', exitCode: 0 },
+      { command: 'git ls-remote', exitCode: 0 },
       { command: 'git push', exitCode: 0 }
     ]);
 
@@ -126,7 +126,7 @@ describe('branch workflow', () => {
     expect(utils.closePullRequest.callCount).toEqual(1);
     expect(outString).toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
     expect(utils.deleteBranch.callCount).toEqual(1);
-    expect(outString).toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
     expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 
@@ -138,7 +138,7 @@ describe('branch workflow', () => {
     expect(utils.closePullRequest.callCount).toEqual(0);
     expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
     expect(utils.deleteBranch.callCount).toEqual(0);
-    expect(outString).not.toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).not.toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
     expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 
@@ -152,7 +152,7 @@ describe('branch workflow', () => {
     expect(utils.closePullRequest.callCount).toEqual(0);
     expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
     expect(utils.deleteBranch.callCount).toEqual(0);
-    expect(outString).not.toMatch(`git show-ref --quiet --verify -- refs/remotes/${utils.getOrigin()}/${branch}`);
+    expect(outString).not.toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
     expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 
