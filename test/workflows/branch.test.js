@@ -21,7 +21,7 @@ describe('branch workflow', () => {
 
   // to match the response from the testSearchResult.json fixture
   const owner = 'jonabc';
-  const repo = 'repo';
+  const repo = 'setup-licensed';
 
   let outString;
   const processEnv = process.env;
@@ -29,6 +29,11 @@ describe('branch workflow', () => {
   const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
   const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
   const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
+
+  const pullRequest = searchResultFixture.items[0];
+  const closedPullRequest = { ...pullRequest, state: 'closed' };
+  const updatePullsEndpoint = octokit.pulls.update.endpoint({ owner, repo, pull_number: pullRequest.number });
+  const updatePullsUrl = updatePullsEndpoint.url.replace('https://api.github.com', '');
 
   beforeEach(() => {
     process.env = {
@@ -56,9 +61,10 @@ describe('branch workflow', () => {
       { command: '', exitCode: 0 }
     ]);
 
-    mocks.github.mock(
-      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
-    );
+    mocks.github.mock([
+      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture },
+      { method: 'PATCH', uri: updatePullsUrl, response: closedPullRequest }
+    ]);
 
     Object.keys(utils).forEach(key => sinon.spy(utils, key));
   });
@@ -104,6 +110,15 @@ describe('branch workflow', () => {
     expect(outString).not.toMatch(`${command} env`);
     expect(outString).not.toMatch('git add -- .');
     expect(outString).not.toMatch('git diff-index --quiet HEAD -- .');
+  });
+
+  it('cleans pull requests if status checks succeed', async () => {
+    mocks.exec.mock([
+      { command: 'licensed status', exitCode: 0 },
+    await workflow();
+
+    expect(utils.closePullRequest.callCount).toEqual(1);
+    expect(outString).toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
   });
 
   describe('with no cached file changes', () => {

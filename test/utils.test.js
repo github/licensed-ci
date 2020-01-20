@@ -292,3 +292,54 @@ describe('findPullRequest', () => {
     expect(outString).not.toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
   });
 });
+
+describe('closePullRequest', () => {
+  const pullRequest = require(path.join(__dirname, 'fixtures', 'pullRequest'));
+  const closedPullRequest = { ...pullRequest, state: 'closed' };
+
+  // to match the response from the pullRequest.json fixture
+  const owner = 'octocat';
+  const repo = 'Hellow-World';
+
+  const updatePullsEndpoint = octokit.pulls.update.endpoint({ owner, repo, pull_number: pullRequest.number });
+  const updatePullsUrl = updatePullsEndpoint.url.replace('https://api.github.com', '');
+
+  const processEnv = process.env;
+  let outString;
+
+  beforeEach(() => {
+    process.env = {
+      ...process.env,
+      GITHUB_REPOSITORY: `${owner}/${repo}`
+    };
+
+    outString = '';
+    mocks.github.setLog(log => outString += log + os.EOL);
+    mocks.github.mock(
+      { method: 'PATCH', uri: updatePullsUrl, response: closedPullRequest }
+    );
+  })
+
+  afterEach(() => {
+    mocks.github.restore();
+    process.env = processEnv;
+  });
+
+  it('closes an open pull request', async () => {
+    const response = await utils.closePullRequest(octokit, pullRequest);
+    expect(response).toEqual(closedPullRequest);
+    expect(outString).toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+  });
+
+  it('does not close an already closed pull request', async () => {
+    const response = await utils.closePullRequest(octokit, closedPullRequest);
+    expect(response).toEqual(closedPullRequest);
+    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+  });
+
+  it('handles a null pull request input', async () => {
+    const response = await utils.closePullRequest(octokit, null);
+    expect(response).toBeNull();
+    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+  });
+});
