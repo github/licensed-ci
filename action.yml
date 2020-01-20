@@ -33,8 +33,8 @@ inputs:
     default: push
   cleanup_on_success:
     description: 'Whether to close open PRs and delete license branches on CI success in user branch. Only used by `branch` workflow'
-      required: false
-      default: 'false'
+    required: false
+    default: 'false'
 outputs:
   licenses_branch:
     description: The branch containing licensed-ci changes.
