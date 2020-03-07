@@ -215,6 +215,7 @@ describe('branch workflow', () => {
       // minimal expectations about PR body template substitutions
       expect(body.body).toMatch(parent);
       expect(body.body).toMatch(process.env.INPUT_PR_COMMENT);
+      expect(body.body).toMatch('`licensed status` result')
       expect(body.body).toMatch('succeeded');
       expect(body.body).toMatch('licenses-success');
 
