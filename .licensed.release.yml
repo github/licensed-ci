@@ -6,3 +6,9 @@ allowed:
 - mit
 - cc0-1.0
 - unlicense
+
+reviewed:
+  npm:
+    - lodash.get
+    - lodash.set
+    - lodash.uniq
