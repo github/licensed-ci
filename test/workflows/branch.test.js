@@ -188,9 +188,9 @@ describe('branch workflow', () => {
         { command: 'git diff-index', exitCode: 1 }
       ]);
       mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A${branch}`, response: { items: [licensesPullRequest] } },
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: { items: [licensesPullRequest] } },
         { method: 'POST', uri: createLicensesPRCommentUrl },
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A${parent}$`, response: emptySearchResult },
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: emptySearchResult },
         { method: 'POST', uri: createUserPRCommentUrl }
       ]);
     });
@@ -213,13 +213,13 @@ describe('branch workflow', () => {
     it('opens a PR for changes', async () => {
       process.env.INPUT_PR_COMMENT = 'pr_comment';
       mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A${branch}`, response: emptySearchResult },
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: emptySearchResult },
         { method: 'POST', uri: createPRUrl, response: licensesPullRequest },
         { method: 'POST', url: createReviewRequestUrl }
       ]);
 
       await expect(workflow()).rejects.toThrow();
-      let query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`;
+      let query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${branch}" base:"${parent}"`;
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
 
       let match = outString.match(`POST ${createPRUrl} : (.+)`);
@@ -243,11 +243,11 @@ describe('branch workflow', () => {
 
     it('does not open a PR for changes if it exists', async () => {
       mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A${branch}$`, response: { items: [licensesPullRequest] } }
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: { items: [licensesPullRequest] } }
       ]);
 
       await expect(workflow()).rejects.toThrow();
-      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${branch} base:${parent}`
+      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${branch}" base:"${parent}"`
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
       expect(outString).not.toMatch(`POST ${createPRUrl}`);
 
@@ -259,11 +259,11 @@ describe('branch workflow', () => {
 
     it('adds a comment to the parent PR if it exists', async () => {
       mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A${parent}$`, response: { items: [pullRequest] } }
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: { items: [pullRequest] } }
       ]);
 
       await expect(workflow()).rejects.toThrow();
-      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${parent}`;
+      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${parent}"`;
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)} :`);
 
       const match = outString.match(`POST ${createUserPRCommentUrl} : (.+)`);
@@ -275,12 +275,12 @@ describe('branch workflow', () => {
 
     it('does not add a comment to the parent PR if it does not exist', async () => {
       mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A${parent}$`, response: { items: [] } }
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: { items: [] } }
       ]);
 
       await expect(workflow()).rejects.toThrow();
 
-      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:${parent}`;
+      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${parent}"`;
       expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
 
       expect(outString).not.toMatch(`POST ${createUserPRCommentUrl} : (.+)`);
