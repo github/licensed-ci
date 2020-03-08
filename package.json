@@ -26,7 +26,6 @@
     "@actions/exec": "^1.0.1",
     "@actions/github": "^1.1.0",
     "@actions/io": "^1.0.1",
-    "chalk": "^3.0.0",
     "moment": "^2.24.0"
   },
   "devDependencies": {
