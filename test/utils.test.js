@@ -276,14 +276,14 @@ describe('findPullRequest', () => {
   });
 
   it('finds a pull request for a head and base branch', async () => {
-    const pullRequest = await utils.findPullRequest(octokit, head, base);
+    const pullRequest = await utils.findPullRequest(octokit, { head, base });
     expect(pullRequest).toEqual(searchResultFixture.items[0]);
     const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${head}" base:"${base}"`;
     expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
   });
 
   it('finds a pull request for a head branch', async () => {
-    const pullRequest = await utils.findPullRequest(octokit, head);
+    const pullRequest = await utils.findPullRequest(octokit, { head });
     expect(pullRequest).toEqual(searchResultFixture.items[0]);
     let query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${head}"`;
     expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
