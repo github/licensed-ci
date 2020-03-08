@@ -216,19 +216,6 @@ describe('ensureBranch', () => {
         `Unable to find or create the ${branch} branch`
       );
     });
-
-    it('rebases branch on parent', async () => {
-      await utils.ensureBranch(branch, parent);
-      expect(outString).toMatch(`git rebase ${parent} ${branch}`);
-    });
-
-    it('raises an error if rebasing failed', async () => {
-      mocks.exec.mock({ command: `git rebase ${parent} ${branch}`, exitCode: 1 });
-
-      await expect(utils.ensureBranch(branch, parent)).rejects.toThrow(
-        `Unable to get ${branch} up to date with ${parent}`
-      );
-    });
   });
 
   describe('when branch === parent', () => {
@@ -245,11 +232,6 @@ describe('ensureBranch', () => {
       await expect(utils.ensureBranch(branch, branch)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
       );
-    });
-
-    it('does not perform a rebase', async () => {
-      await utils.ensureBranch(branch, branch);
-      expect(outString).not.toMatch(`git rebase ${branch} ${branch}`);
     });
   });
 });
