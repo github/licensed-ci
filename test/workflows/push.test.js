@@ -143,7 +143,8 @@ describe('push workflow', () => {
       );
 
       await workflow();
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      const query = `is:pr is:open repo:${owner}/${repo} head:"${branch}"`;
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
 
@@ -156,7 +157,8 @@ describe('push workflow', () => {
       );
 
       await workflow();
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      const query = `is:pr is:open repo:${owner}/${repo} head:"${branch}"`;
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
       expect(outString).not.toMatch(`POST ${createCommentUrl}`);
     });
 
@@ -166,7 +168,8 @@ describe('push workflow', () => {
       mocks.github.mock({ method: 'POST', uri: createCommentUrl });
 
       await workflow();
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=is%3Apr%20is%3Aopen%20repo%3A${owner}%2F${repo}%20head%3A${branch}`);
+      const query = `is:pr is:open repo:${owner}/${repo} head:"${branch}"`;
+      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
       expect(outString).toMatch(`POST ${createCommentUrl} : ${JSON.stringify({ body: process.env.INPUT_PR_COMMENT})}`);
     });
 
