@@ -25,7 +25,8 @@
     "@actions/core": "^1.2.0",
     "@actions/exec": "^1.0.1",
     "@actions/github": "^1.1.0",
-    "@actions/io": "^1.0.1"
+    "@actions/io": "^1.0.1",
+    "moment": "^2.24.0"
   },
   "devDependencies": {
     "@jonabc/actions-mocks": "^1.1.1",
