@@ -89,6 +89,7 @@ describe('branch workflow', () => {
     expect(utils.getBranch.callCount).toEqual(1);
     expect(utils.getLicensedInput.callCount).toBeGreaterThan(1);
     expect(utils.ensureBranch.withArgs(branch, parent).callCount).toEqual(1);
+    expect(outString).toMatch(`git merge -s recursive -Xtheirs origin/${parent}`);
     expect(outString).toMatch(`${command} cache -c ${configFile}`);
     expect(utils.getCachePaths.callCount).toEqual(1);
     expect(outString).toMatch(`${command} env`);
