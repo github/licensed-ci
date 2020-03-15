@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@jonabc/actions-mocks": "^1.1.1",
-    "acorn": "^6.3.0",
+    "acorn": "^6.4.1",
     "eslint": "^6.3.0",
     "jest": "^24.9.0",
     "nock": "^11.3.5",
