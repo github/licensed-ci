@@ -87,7 +87,7 @@ describe('push workflow', () => {
     expect(outString).toMatch('git diff-index --quiet HEAD -- .');
 
     // expect branch information set in output
-    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${branch}`));
     expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
@@ -96,7 +96,7 @@ describe('push workflow', () => {
     await expect(workflow()).rejects.toThrow('Cached metadata checks failed');
 
     // expect branch information set in output
-    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
+    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${branch}`));
     expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
   });
 
