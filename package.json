@@ -4,8 +4,9 @@
   "description": "GitHub Actions CI workflow for github/licensed",
   "main": "lib/index.js",
   "scripts": {
-    "lint": "eslint **/*.js",
-    "test": "eslint **/*.js && jest"
+    "lint": "eslint lib test",
+    "test": "npm run lint && jest",
+    "package": "ncc build lib/index.js -o dist"
   },
   "repository": {
     "type": "git",
@@ -29,10 +30,17 @@
   },
   "devDependencies": {
     "@jonabc/actions-mocks": "^1.1.1",
+    "@zeit/ncc": "^0.22.3",
     "acorn": "^6.3.0",
     "eslint": "^6.3.0",
+    "husky": "^4.2.5",
     "jest": "^24.9.0",
     "nock": "^11.3.5",
     "sinon": "^7.4.2"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "npm run package && git add dist"
+    }
   }
 }
