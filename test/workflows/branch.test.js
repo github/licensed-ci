@@ -258,6 +258,37 @@ describe('branch workflow', () => {
       expect(outString).toMatch(new RegExp('set-output.*pr_created.*false'));
     });
 
+    it('links the created PR to the parent branch', async () => {
+      mocks.github.mock([
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: emptySearchResult },
+        { method: 'POST', uri: createPRUrl, response: licensesPullRequest },
+        { method: 'POST', url: createReviewRequestUrl }
+      ]);
+
+      await expect(workflow()).rejects.toThrow();
+
+      let match = outString.match(`POST ${createPRUrl} : (.+)`);
+      expect(match).toBeTruthy();
+      let body = JSON.parse(match[1]);
+      expect(body.body).toMatch(`[branch](https://github.com/${owner}/${repo}/tree/${parent})`);
+    });
+
+    it('links the created PR to the parent PR if it exists', async () => {
+      mocks.github.mock([
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: emptySearchResult },
+        { method: 'POST', uri: createPRUrl, response: licensesPullRequest },
+        { method: 'POST', url: createReviewRequestUrl },
+        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: { items: [pullRequest] } }
+      ]);
+
+      await expect(workflow()).rejects.toThrow();
+
+      let match = outString.match(`POST ${createPRUrl} : (.+)`);
+      expect(match).toBeTruthy();
+      let body = JSON.parse(match[1]);
+      expect(body.body).toMatch(`[PR](${pullRequest.html_url})`);
+    });
+
     it('adds a comment to the parent PR if it exists', async () => {
       mocks.github.mock([
         { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: { items: [pullRequest] } }
