@@ -29,6 +29,8 @@ describe('push workflow', () => {
   const processEnv = process.env;
   let outString;
 
+  const contextPayload = github.context.payload;
+
   beforeEach(() => {
     process.env = {
       ...process.env,
@@ -38,7 +40,6 @@ describe('push workflow', () => {
       INPUT_USER_EMAIL: userEmail,
       INPUT_COMMAND: command,
       INPUT_CONFIG_FILE: configFile,
-      GITHUB_REF: `refs/heads/${branch}`,
       GITHUB_REPOSITORY: `${owner}/${repo}`,
     };
 
@@ -47,6 +48,8 @@ describe('push workflow', () => {
     mocks.github.setLog(log => outString += log + os.EOL);
 
     sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
+
+    github.context.payload = { ref: `refs/heads/${branch}` };
 
     mocks.exec.mock([
       { command: 'licensed env', exitCode: 1 },
@@ -65,6 +68,7 @@ describe('push workflow', () => {
     sinon.restore();
     mocks.exec.restore();
     process.env = processEnv;
+    github.context.payload = contextPayload;
   });
 
   it('does not cache data if no changes are needed', async () => {

@@ -31,8 +31,8 @@ describe('licensed-ci', () => {
         INPUT_COMMAND: command,
         INPUT_CONFIG_FILE: configFile,
         INPUT_WORKFLOW: 'push',
-        GITHUB_REF: `refs/heads/${branch}`,
-        GITHUB_REPOSITORY: `${owner}/${repo}`
+        GITHUB_REPOSITORY: `${owner}/${repo}`,
+        GITHUB_EVENT_PATH: path.resolve(__dirname, './fixtures/push_payload.json')
       },
       mocks: {
         exec: [
