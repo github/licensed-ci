@@ -110,34 +110,35 @@ describe('getLicensedInput', () => {
 });
 
 describe('getBranch', () => {
-  beforeEach(() => {
-    process.env.GITHUB_REF = 'refs/heads/branch';
-  });
-
   it('raises an error when ref is not found', () => {
-    delete process.env.GITHUB_REF;
-
-    expect(() => utils.getBranch()).toThrow(
-      'Current ref not available'
+    expect(() => utils.getBranch({})).toThrow(
+      'Unable to determine a HEAD branch reference for undefined event type'
     );
   });
 
   it('raises an error when ref is not a branch', () => {
-    process.env.GITHUB_REF = 'refs/tags/v1';
-
-    expect(() => utils.getBranch()).toThrow(
+    const context = { payload: { ref: 'refs/tags/v1' }};
+    expect(() => utils.getBranch(context)).toThrow(
       'refs/tags/v1 does not reference a branch'
     );
   });
 
-  it('returns the branch name', () => {
-    expect(utils.getBranch()).toEqual('branch');
+  it('returns the branch name from payload.ref', () => {
+    const context = { payload: { ref: 'refs/heads/branch' }};
+
+    expect(utils.getBranch(context)).toEqual('branch');
+  });
+
+  it('returns the branch name from a pull request payload', () => {
+    const context = { payload: { pull_request: { head: { ref: 'branch' }}}};
+
+    expect(utils.getBranch(context)).toEqual('branch');
   });
 });
 
 describe('getCachePaths', () => {
   const command = 'licensed';
-  const configFile = path.normalize(path.join(__dirname, '..', '.licensed.yml'));
+  const configFile = path.resolve(__dirname, '..', '.licensed.yml');
   let outString;
 
   beforeEach(() => {

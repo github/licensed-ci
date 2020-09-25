@@ -35,6 +35,8 @@ describe('branch workflow', () => {
   const updatePullsEndpoint = octokit.pulls.update.endpoint({ owner, repo, pull_number: pullRequest.number });
   const updatePullsUrl = updatePullsEndpoint.url.replace('https://api.github.com', '');
 
+  const contextPayload = github.context.payload;
+
   beforeEach(() => {
     process.env = {
       ...process.env,
@@ -45,7 +47,6 @@ describe('branch workflow', () => {
       INPUT_COMMAND: command,
       INPUT_CONFIG_FILE: configFile,
       INPUT_CLEANUP_ON_SUCCESS: 'false',
-      GITHUB_REF: `refs/heads/${parent}`,
       GITHUB_REPOSITORY: `${owner}/${repo}`,
       GITHUB_ACTOR: 'actor'
     };
@@ -55,6 +56,7 @@ describe('branch workflow', () => {
     mocks.github.setLog(log => outString += log + os.EOL);
 
     sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
+    github.context.payload = { ref: `refs/heads/${parent}` };
 
     mocks.exec.mock([
       { command: 'licensed env', exitCode: 1 },
@@ -75,6 +77,8 @@ describe('branch workflow', () => {
     sinon.restore();
     mocks.exec.restore();
     mocks.github.restore();
+
+    github.context.payload = contextPayload;
   });
 
   it('does not cache data if no changes are needed', async () => {
@@ -103,7 +107,7 @@ describe('branch workflow', () => {
   });
 
   it('does not cache metadata on licenses branch', async () => {
-    process.env.GITHUB_REF = `refs/heads/${branch}`;
+    github.context.payload.ref = `refs/heads/${branch}`;
     await expect(workflow()).rejects.toThrow();
     expect(utils.getBranch.callCount).toEqual(1);
     expect(utils.getLicensedInput.callCount).toEqual(1);
@@ -145,7 +149,7 @@ describe('branch workflow', () => {
   });
 
   it('does not clean pull request and branch if status check succeeds on licenses branch', async () => {
-    process.env.GITHUB_REF = `refs/heads/${branch}`;
+    github.context.payload.ref = `refs/heads/${branch}`;
     process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
     mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
 
