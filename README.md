@@ -56,8 +56,14 @@ Notes:
 
 Basic usage with a licensed release package using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)
 ```yaml
+# also works with pull_request event
+on: push
+
 steps:
-- uses: actions/checkout@master
+# if using actions/checkout at major version 2 or greater,
+# please set fetch-depth to a high number, or to 0.
+# running this action can require access to more than just the latest commit on a branch
+- uses: actions/checkout@v1
 - uses: jonabc/setup-licensed@v1
   with:
     version: 2.x
@@ -78,10 +84,16 @@ steps:
       })
 ```
 
-Basic usage with bundled licensed gem
+Basic usage installing licensed gem using bundler + Gemfile
 ```yaml
+# also works with pull_request event
+on: push
+
 steps:
-- uses: actions/checkout@master
+# if using actions/checkout at major version 2 or greater,
+# please set fetch-depth to a high number, or to 0.
+# running this action can require access to more than just the latest commit on a branch
+- uses: actions/checkout@v1
 - uses: actions/setup-ruby@v1
   with:
     ruby-version: 2.6.x
@@ -91,6 +103,10 @@ steps:
     github_token: ${{ secrets.GITHUB_TOKEN }}
     command: 'bundle exec licensed' # or bin/licensed when using binstubs
 ```
+
+#### Supported Events
+
+This action supports the `push` and `pull_request` events.
 
 # License
 
