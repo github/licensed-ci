@@ -130,7 +130,7 @@ describe('getBranch', () => {
   });
 
   it('returns the branch name from a pull request payload', () => {
-    const context = { payload: { pull_request: { head: { ref: 'branch' }}}};
+    const context = { payload: { ref: 'refs/pulls/123/merge', pull_request: { head: { ref: 'branch' }}}};
 
     expect(utils.getBranch(context)).toEqual('branch');
   });
