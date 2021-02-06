@@ -2537,7 +2537,7 @@ async function status() {
 
 async function run() {
   let licensesUpdated = false;
-  const branch = utils.getBranch();
+  const branch = utils.getBranch(github.context);
   core.setOutput('licenses_branch', branch);
   core.setOutput('user_branch', branch);
 
@@ -8382,7 +8382,7 @@ async function notifyUser(octokit, userPullRequest, licensesPullRequest, created
 
 function getLicensesBranches(branch) {
   if (branch.endsWith('-licenses')) {
-    return [branch, branch.replace('-licenses', '')];
+    return [branch, branch.replace(/-licenses$/, '')];
   }
 
   return [`${branch}-licenses`, branch];
@@ -8407,7 +8407,7 @@ async function run() {
   let licensesUpdated = false;
   let pullRequestCreated = false;
 
-  const branch = utils.getBranch();
+  const branch = utils.getBranch(github.context);
   const [licensesBranch, userBranch] = getLicensesBranches(branch);
   core.setOutput('licenses_branch', licensesBranch);
   core.setOutput('user_branch', userBranch);
@@ -8415,7 +8415,7 @@ async function run() {
   // // find an existing pull request, if one exists
   const token = core.getInput('github_token', { required: true });
   const octokit = new github.GitHub(token);
-  let licensesPullRequest = await utils.findPullRequest(octokit, { head: licensesBranch, base: branch });
+  let licensesPullRequest = await utils.findPullRequest(octokit, { head: licensesBranch, base: userBranch });
 
   // check whether cached metadata needs any updating
   let statusResult = await status();
@@ -8436,12 +8436,12 @@ async function run() {
     const { command, configFilePath } = await utils.getLicensedInput();
 
     // change to a `<branch>-licenses` branch to continue updates
-    await utils.ensureBranch(licensesBranch, branch);
+    await utils.ensureBranch(licensesBranch, userBranch);
 
     // ensure that branch is up to date with parent
-    let exitCode = await exec.exec('git', ['merge', '-s', 'recursive', '-Xtheirs', `origin/${branch}`], { ignoreReturnCode: true });
+    let exitCode = await exec.exec('git', ['merge', '-s', 'recursive', '-Xtheirs', `origin/${userBranch}`], { ignoreReturnCode: true });
     if (exitCode !== 0) {
-      throw new Error(`Unable to get ${licensesBranch} up to date with ${branch}`);
+      throw new Error(`Unable to get ${licensesBranch} up to date with ${userBranch}`);
     }
 
     // cache any metadata updates
@@ -8460,14 +8460,14 @@ async function run() {
       await exec.exec('git', ['push', utils.getOrigin(), licensesBranch]);
       licensesUpdated = true;
 
-      const userPullRequest = await utils.findPullRequest(octokit, { head: branch, "-base": branch });
+      const userPullRequest = await utils.findPullRequest(octokit, { head: userBranch, "-base": userBranch });
       if (!licensesPullRequest) {
-        licensesPullRequest = await createLicensesPullRequest(octokit, licensesBranch, branch, userPullRequest);
+        licensesPullRequest = await createLicensesPullRequest(octokit, licensesBranch, userBranch, userPullRequest);
         pullRequestCreated = true;
       }
 
       statusResult = await status();
-      await notifyStatus(octokit, branch, userPullRequest, licensesPullRequest, statusResult);
+      await notifyStatus(octokit, userBranch, userPullRequest, licensesPullRequest, statusResult);
 
       if (userPullRequest) {
         await notifyUser(octokit, userPullRequest, licensesPullRequest, pullRequestCreated);
@@ -8783,16 +8783,18 @@ async function getLicensedInput() {
   return { command, configFilePath };
 }
 
-function getBranch() {
-  // checkout the target branch
-  let branch = process.env.GITHUB_REF;
-  if (!branch) {
-    throw new Error('Current ref not available');
-  } else if (!branch.startsWith('refs/heads')) {
-    throw new Error(`${branch} does not reference a branch`);
+function getBranch(context) {
+  if (context.payload && context.payload.pull_request) {
+    return context.payload.pull_request.head.ref;
+  } else if (context.payload && context.payload.ref) {
+    const ref = context.payload.ref;
+    if (!ref.startsWith('refs/heads')) {
+      throw new Error(`${ref} does not reference a branch`);
+    }
+    return ref.replace('refs/heads/', '');
   }
 
-  return branch.replace('refs/heads/', '');
+  throw new Error(`Unable to determine a HEAD branch reference for ${context.eventName} event type`);
 }
 
 async function getCachePaths(command, configFilePath) {
