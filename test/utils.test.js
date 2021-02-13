@@ -4,7 +4,7 @@ const path = require('path');
 const os = require('os');
 const utils = require('../lib/utils');
 
-const octokit = new github.GitHub('token');
+const octokit = github.getOctokit('token');
 
 describe('configureGit', () => {
   let outString;

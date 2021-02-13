@@ -6,7 +6,7 @@ const sinon = require('sinon');
 const utils = require('../../lib/utils');
 const workflow = require('../../lib/workflows/branch');
 
-const octokit = new github.GitHub('token');
+const octokit = github.getOctokit('token');
 
 describe('branch workflow', () => {
   const token = 'token';
@@ -175,7 +175,7 @@ describe('branch workflow', () => {
 
     const createPREndpoint = octokit.pulls.create.endpoint({ owner, repo });
     const createPRUrl = createPREndpoint.url.replace('https://api.github.com', '');
-    const createReviewRequestEndpoint = octokit.pulls.createReviewRequest.endpoint({ owner, repo, pull_number: licensesPullRequest.number });
+    const createReviewRequestEndpoint = octokit.pulls.requestReviewers.endpoint({ owner, repo, pull_number: licensesPullRequest.number });
     const createReviewRequestUrl = createReviewRequestEndpoint.url.replace('https://api.github.com', '');
 
     const createLicensesPRCommentEndpoint = octokit.issues.createComment.endpoint({ owner, repo, issue_number: licensesPullRequest.number });
