@@ -57,7 +57,12 @@ Notes:
 Basic usage with a licensed release package using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)
 ```yaml
 # also works with pull_request event
-on: push
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
 
 steps:
 # if using actions/checkout at major version 2 or greater,
@@ -87,7 +92,12 @@ steps:
 Basic usage installing licensed gem using bundler + Gemfile
 ```yaml
 # also works with pull_request event
-on: push
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
 
 steps:
 # if using actions/checkout at major version 2 or greater,
@@ -106,7 +116,7 @@ steps:
 
 #### Supported Events
 
-This action supports the `push` and `pull_request` events.
+This action supports the `push` and `pull_request` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
 
 # License
 

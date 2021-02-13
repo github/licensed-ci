@@ -1,8 +1,13 @@
-name: "Test"
-on: push
+name: "Run licensed in test"
+on:
+  push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
 
 jobs:
-  npm_test:
+  licensed_ci:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -13,8 +18,11 @@ jobs:
       with:
         node-version: ${{ matrix.node }}
 
-    - run: npm install
+    - run: npm install --production
     - uses: jonabc/setup-licensed@v1
       with:
         version: '2.x'
-    - run: npm run test
+    - uses: ./
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        workflow: push
