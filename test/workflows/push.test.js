@@ -6,7 +6,7 @@ const sinon = require('sinon').createSandbox();
 const utils = require('../../lib/utils');
 const workflow = require('../../lib/workflows/push');
 
-const octokit = new github.GitHub('token');
+const octokit = github.getOctokit('token');
 
 describe('push workflow', () => {
   const token = 'token';

@@ -17,3 +17,4 @@ reviewed:
   - lodash.set
   - lodash.uniq
   - universal-user-agent
+  - "@actions/http-client"
