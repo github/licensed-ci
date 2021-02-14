@@ -105,6 +105,30 @@ describe('getLicensedInput', () => {
   });
 });
 
+describe('checkStatus', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('runs a license status command and returns the results', async () => {
+    sinon.stub(exec, 'exec').callsFake((command, args, options) => {
+      options.listeners.stdout('output to log');
+      return Promise.resolve(0);
+    });
+
+    const { success, log } = await utils.checkStatus('test', '.licensed.test.yml');
+    expect(success).toEqual(true);
+    expect(log).toEqual('output to log');
+    expect(exec.exec.callCount).toEqual(1);
+    expect(exec.exec.getCall(0).args).toEqual(
+      expect.arrayContaining([
+        'test',
+        ['status', '-c', '.licensed.test.yml']
+      ])
+    );
+  });
+});
+
 describe('getBranch', () => {
   it('raises an error when ref is not found', () => {
     expect(() => utils.getBranch({})).toThrow(
