@@ -1,26 +1,21 @@
-const github = require('@actions/github');
-const { mocks } = require('@jonabc/actions-mocks');
+const exec = require('@actions/exec');
 const path = require('path');
-const os = require('os');
+const sinon = require('sinon');
 const utils = require('../lib/utils');
 
-const octokit = github.getOctokit('token');
+const processEnv = process.env;
 
 describe('configureGit', () => {
-  let outString;
-
   beforeEach(() => {
     process.env.INPUT_USER_NAME = 'user';
     process.env.INPUT_USER_EMAIL = 'email';
     process.env.INPUT_GITHUB_TOKEN = 'token';
-
-    outString = '';
-    mocks.exec.setLog(log => outString += log + os.EOL);
-    mocks.exec.mock({ command: '', exitCode: 0 })
+    process.env.GITHUB_REPOSITORY = 'jonabc/licensed-ci';
   })
 
   afterEach(() => {
-    mocks.exec.restore();
+    sinon.restore();
+    process.env = processEnv;
   });
 
   it('raises an error when user_name is not given', async () => {
@@ -47,17 +42,14 @@ describe('configureGit', () => {
     );
   });
 
-  it('configures the repository with the user name and email input', async () => {
-    await utils.configureGit();
-    expect(outString).toMatch(`git config user.name ${process.env.INPUT_USER_NAME}`);
-    expect(outString).toMatch(`git config user.email ${process.env.INPUT_USER_EMAIL}`);
-  });
+  it('configures the local git repository', async () => {
+    sinon.stub(exec, 'exec').resolves();
 
-  it('configures the licensed-ci-origin remote', async () => {
     await utils.configureGit();
-    expect(outString).toMatch(
-      `git remote add ${utils.getOrigin()} https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`
-    );
+    expect(exec.exec.callCount).toEqual(3);
+    expect(exec.exec.getCall(0).args).toEqual(['git', ['config', 'user.name', process.env.INPUT_USER_NAME]]);
+    expect(exec.exec.getCall(1).args).toEqual(['git', ['config', 'user.email', process.env.INPUT_USER_EMAIL]]);
+    expect(exec.exec.getCall(2).args).toEqual(['git', ['remote', 'add', utils.getOrigin(), `https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`]]);
   });
 });
 
@@ -68,6 +60,10 @@ describe('getLicensedInput', () => {
   beforeEach(() => {
     process.env.INPUT_COMMAND = command;
     process.env.INPUT_CONFIG_FILE = configFile;
+  });
+
+  afterEach(() => {
+    process.env = processEnv;
   });
 
   it('raises an error when command is not given', async () => {
@@ -109,6 +105,30 @@ describe('getLicensedInput', () => {
   });
 });
 
+describe('checkStatus', () => {
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('runs a license status command and returns the results', async () => {
+    sinon.stub(exec, 'exec').callsFake((command, args, options) => {
+      options.listeners.stdout('output to log');
+      return Promise.resolve(0);
+    });
+
+    const { success, log } = await utils.checkStatus('test', '.licensed.test.yml');
+    expect(success).toEqual(true);
+    expect(log).toEqual('output to log');
+    expect(exec.exec.callCount).toEqual(1);
+    expect(exec.exec.getCall(0).args).toEqual(
+      expect.arrayContaining([
+        'test',
+        ['status', '-c', '.licensed.test.yml']
+      ])
+    );
+  });
+});
+
 describe('getBranch', () => {
   it('raises an error when ref is not found', () => {
     expect(() => utils.getBranch({})).toThrow(
@@ -139,27 +159,25 @@ describe('getBranch', () => {
 describe('getCachePaths', () => {
   const command = 'licensed';
   const configFile = path.resolve(__dirname, '..', '.licensed.yml');
-  let outString;
-
-  beforeEach(() => {
-    outString = '';
-    mocks.exec.setLog(log => outString += log + os.EOL);
-    mocks.exec.mock({ command: '', exitCode: 0 })
-  })
 
   afterEach(() => {
-    mocks.exec.restore();
+    sinon.restore()
   });
 
   it('calls licensed env', async () => {
-    mocks.exec.mock({ command: 'licensed env', exitCode: 1 });
+    sinon.stub(exec, 'exec').resolves(1);
 
     await utils.getCachePaths(command, configFile);
-    expect(outString).toMatch(`licensed env --format json -c ${configFile}`);
+    expect(exec.exec.callCount).toEqual(1);
+    expect(exec.exec.getCall(0).args).toEqual(
+      expect.arrayContaining(
+        ['licensed', ['env', '--format', 'json', '-c', configFile]]
+      )
+    );
   });
 
   it('returns default paths if licensed env is not available', async () => {
-    mocks.exec.mock({ command: 'licensed env', exitCode: 1 });
+    sinon.stub(exec, 'exec').resolves(1);
 
     const cachePaths = await utils.getCachePaths(command, configFile);
     expect(cachePaths).toEqual(['.']);
@@ -172,7 +190,11 @@ describe('getCachePaths', () => {
         { cache_path: 'test/licenses' }
       ]
     };
-    mocks.exec.mock({ command: 'licensed env', stdout: JSON.stringify(env), exitCode: 0 });
+
+    sinon.stub(exec, 'exec').callsFake((command, args, options) => {
+      options.listeners.stdout(JSON.stringify(env));
+      return Promise.resolve(0);
+    });
 
     const cachePaths = await utils.getCachePaths(command, configFile);
     expect(cachePaths).toEqual(['project/licenses', 'test/licenses']);
@@ -183,35 +205,49 @@ describe('ensureBranch', () => {
   let branch = 'branch';
   let parent = 'parent';
 
-  let outString;
-
-  beforeEach(() => {
-    outString = '';
-    mocks.exec.setLog(log => outString += log + os.EOL);
-    mocks.exec.mock({ command: '', exitCode: 0 });
-  })
-
   afterEach(() => {
-    mocks.exec.restore();
+    sinon.restore();
   });
 
   it('checks out a branch if it exists', async () => {
+    sinon.stub(exec, 'exec').resolves(0);
+
     await utils.ensureBranch(branch, branch);
-    expect(outString).toMatch(`git checkout ${branch}`);
+    expect(exec.exec.callCount).toEqual(1);
+    expect(exec.exec.getCall(0).args).toEqual([
+      'git',
+      ['checkout', branch],
+      { ignoreReturnCode: true }
+    ]);
   });
 
   describe('when branch !== parent', () => {
     it('creates a branch if it doesn\'t exist', async () => {
-      mocks.exec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
+      sinon.stub(exec, 'exec')
+        .withArgs('git', ['checkout', branch]).resolves(1)
+        .withArgs('git', ['checkout', parent]).resolves(0)
+        .withArgs('git', ['checkout', '-b', branch]).resolves(0);
 
       await utils.ensureBranch(branch, parent);
-      expect(outString).toMatch(`git checkout ${parent}`);
-      expect(outString).toMatch(`git checkout -b ${branch}`);
+      expect(exec.exec.callCount).toEqual(3);
+      expect(exec.exec.getCall(0).args).toEqual([
+        'git',
+        ['checkout', branch],
+        { ignoreReturnCode: true }
+      ]);
+      expect(exec.exec.getCall(1).args).toEqual(['git', ['checkout', parent]]);
+      expect(exec.exec.getCall(2).args).toEqual([
+        'git',
+        ['checkout', '-b', branch],
+        { ignoreReturnCode: true }
+      ]);
     });
 
     it('raises an error if checkout and create fail', async () => {
-      mocks.exec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
-      mocks.exec.mock({ command: `git checkout -b ${branch}`, exitCode: 1 });
+      sinon.stub(exec, 'exec')
+        .withArgs('git', ['checkout', branch]).resolves(1)
+        .withArgs('git', ['checkout', parent]).resolves(0)
+        .withArgs('git', ['checkout', '-b', branch]).resolves(1);
 
       await expect(utils.ensureBranch(branch, parent)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
@@ -220,59 +256,67 @@ describe('ensureBranch', () => {
   });
 
   describe('when branch === parent', () => {
-    it('does not create branch if it doesn\t exist', async () => {
-      mocks.exec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
-
-      await utils.ensureBranch(branch, branch).catch(() => {});
-      expect(outString).not.toMatch(`git checkout -b ${branch} ${branch}`);
-    });
-
     it('raises an error if checkout fails', async () => {
-      mocks.exec.mock({ command: `git checkout ${branch}`, exitCode: 1 });
+      sinon.stub(exec, 'exec').resolves(1);
 
       await expect(utils.ensureBranch(branch, branch)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
       );
+      expect(exec.exec.callCount).toEqual(1);
+      expect(exec.exec.getCall(0).args).toEqual([
+        'git',
+        ['checkout', branch],
+        { ignoreReturnCode: true }
+      ]);
     });
   });
 });
 
 describe('findPullRequest', () => {
-  const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
-  const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
   const searchResultFixture = require(path.join(__dirname, 'fixtures', 'testSearchResult'));
   const head = 'head';
   const base = 'base';
 
-  let outString;
+  let octokit;
+  let endpoint;
 
   beforeEach(() => {
-    outString = '';
-    mocks.github.setLog(log => outString += log + os.EOL);
-    mocks.github.mock(
-      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
-    );
+    process.env.GITHUB_REPOSITORY = 'jonabc/licensed-ci';
+    endpoint = sinon.stub().resolves({ data: searchResultFixture });
+    octokit = {
+      search: {
+        issuesAndPullRequests: endpoint
+      }
+    };
   })
 
   afterEach(() => {
-    mocks.github.restore();
+    process.env = processEnv;
+    sinon.restore();
   });
 
   it('finds a pull request for a head and base branch', async () => {
     const pullRequest = await utils.findPullRequest(octokit, { head, base });
     expect(pullRequest).toEqual(searchResultFixture.items[0]);
-    const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${head}" base:"${base}"`;
-    expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+    expect(endpoint.callCount).toEqual(1);
+    expect(endpoint.getCall(0).args).toEqual([{
+      q: `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${head}" base:"${base}"`
+    }]);
   });
 
   it('finds a pull request for a head branch', async () => {
     const pullRequest = await utils.findPullRequest(octokit, { head });
     expect(pullRequest).toEqual(searchResultFixture.items[0]);
-    let query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${head}"`;
-    expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+    expect(endpoint.callCount).toEqual(1);
+    expect(endpoint.getCall(0).args).toEqual([{
+      q: `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${head}"`
+    }]);
+  });
 
-    query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${head}" base:"${base}"`;
-    expect(outString).not.toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+  it("returns null if a PR isn't found", async () => {
+    endpoint.resolves({ data: { items: [] } });
+    const pullRequest = await utils.findPullRequest(octokit, { head, base });
+    expect(pullRequest).toBeNull();
   });
 });
 
@@ -284,11 +328,8 @@ describe('closePullRequest', () => {
   const owner = 'octocat';
   const repo = 'Hellow-World';
 
-  const updatePullsEndpoint = octokit.pulls.update.endpoint({ owner, repo, pull_number: pullRequest.number });
-  const updatePullsUrl = updatePullsEndpoint.url.replace('https://api.github.com', '');
-
-  const processEnv = process.env;
-  let outString;
+  let octokit;
+  let endpoint;
 
   beforeEach(() => {
     process.env = {
@@ -296,69 +337,69 @@ describe('closePullRequest', () => {
       GITHUB_REPOSITORY: `${owner}/${repo}`
     };
 
-    outString = '';
-    mocks.github.setLog(log => outString += log + os.EOL);
-    mocks.github.mock(
-      { method: 'PATCH', uri: updatePullsUrl, response: closedPullRequest }
-    );
+    endpoint = sinon.stub().resolves({ data: closedPullRequest });
+    octokit = { pulls: { update: endpoint } };
   })
 
   afterEach(() => {
-    mocks.github.restore();
+    sinon.restore();
     process.env = processEnv;
   });
 
   it('closes an open pull request', async () => {
     const response = await utils.closePullRequest(octokit, pullRequest);
     expect(response).toEqual(closedPullRequest);
-    expect(outString).toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(endpoint.callCount).toEqual(1);
+    expect(endpoint.getCall(0).args).toEqual([{
+      owner,
+      repo,
+      pull_number: pullRequest.number,
+      state: 'closed'
+    }]);
   });
 
   it('does not close an already closed pull request', async () => {
     const response = await utils.closePullRequest(octokit, closedPullRequest);
     expect(response).toEqual(closedPullRequest);
-    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(endpoint.callCount).toEqual(0);
   });
 
   it('handles a null pull request input', async () => {
     const response = await utils.closePullRequest(octokit, null);
     expect(response).toBeNull();
-    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(endpoint.callCount).toEqual(0);
   });
 });
 
 describe('deleteBranch', () => {
   const branch = 'branch';
-  let outString;
-
-  beforeEach(() => {
-    outString = '';
-    mocks.exec.setLog(log => outString += log + os.EOL);
-    // console.log = log => outString += log;
-    mocks.exec.mock({ command: '', exitCode: 0 });
-  })
 
   afterEach(() => {
-    mocks.exec.restore();
+    sinon.restore();
   });
 
   it('deletes a git branch', async () => {
+    sinon.stub(exec, 'exec').resolves(0);
     await utils.deleteBranch(branch);
-    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
-    expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+    expect(exec.exec.callCount).toEqual(2);
+    expect(exec.exec.getCall(0).args).toEqual([
+      'git',
+      ['ls-remote', '--exit-code', utils.getOrigin(), branch],
+      { ignoreReturnCode: true }
+    ]);
+    expect(exec.exec.getCall(1).args).toEqual(['git', ['push', utils.getOrigin(), '--delete', branch]]);
   });
 
   it('does not try to delete a branch that doesn\'t exist', async () => {
-    mocks.exec.mock({ command: 'git ls-remote', exitCode: 2 });
+    sinon.stub(exec, 'exec').resolves(1);
     await utils.deleteBranch(branch);
-    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
-    expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+    expect(exec.exec.callCount).toEqual(1);
   });
 
   it('raises an error if branch delete fails', async () => {
-    mocks.exec.mock({ command: 'git push', exitCode: 2 });
+    sinon.stub(exec, 'exec')
+      .withArgs('git', ['ls-remote', '--exit-code', utils.getOrigin(), branch]).resolves(0)
+      .withArgs('git', ['push', utils.getOrigin(), '--delete', branch]).rejects();
     await expect(utils.deleteBranch(branch)).rejects.toThrow();
-    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
-    expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 });

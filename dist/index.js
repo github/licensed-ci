@@ -5,6 +5,16 @@ module.exports =
 /***/ 4822:
 /***/ ((__unused_webpack_module, __unused_webpack_exports, __nccwpck_require__) => {
 
+const run = __nccwpck_require__(1088);
+
+run();
+
+
+/***/ }),
+
+/***/ 1088:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
 const core = __nccwpck_require__(2186);
 const utils = __nccwpck_require__(918);
 const workflows = __nccwpck_require__(6510);
@@ -25,7 +35,7 @@ async function run() {
   }
 }
 
-run()
+module.exports = run;
 
 
 /***/ }),
@@ -60,6 +70,18 @@ async function getLicensedInput() {
   await fs.access(configFilePath); // check that config file exists
 
   return { command, configFilePath };
+}
+
+async function checkStatus(command, configFilePath) {
+  let log = '';
+  const options = {
+    ignoreReturnCode: true,
+    listeners: {
+      stdout: data => log += data.toString()
+    }
+  };
+  const exitCode = await exec.exec(command, ['status', '-c', configFilePath], options);
+  return { success: exitCode === 0, log };
 }
 
 function getBranch(context) {
@@ -153,6 +175,7 @@ module.exports = {
   findPullRequest,
   closePullRequest,
   deleteBranch,
+  checkStatus,
   getOrigin: () => ORIGIN
 };
 
@@ -290,21 +313,6 @@ function getLicensesBranches(branch) {
   return [`${branch}-licenses`, branch];
 }
 
-async function status() {
-  const { command, configFilePath } = await utils.getLicensedInput();
-
-  let log = '';
-  const options = {
-    ignoreReturnCode: true,
-    listeners: {
-      stdout: data => log += data.toString()
-    }
-  };
-
-  const exitCode = await exec.exec(command, ['status', '-c', configFilePath], options);
-  return { success: exitCode === 0, log };
-}
-
 async function run() {
   let licensesUpdated = false;
   let pullRequestCreated = false;
@@ -319,8 +327,10 @@ async function run() {
   const octokit = github.getOctokit(token);
   let licensesPullRequest = await utils.findPullRequest(octokit, { head: licensesBranch, base: userBranch });
 
+  const { command, configFilePath } = await utils.getLicensedInput();
+
   // check whether cached metadata needs any updating
-  let statusResult = await status();
+  let statusResult = await utils.checkStatus(command, configFilePath);
   if (statusResult.success) {
     if (branch !== licensesBranch && core.getInput('cleanup_on_success', { required: true }) === 'true') {
       // delete the licenses branch if it exists
@@ -335,8 +345,6 @@ async function run() {
 
   // recache data only when on a non-licenses branch
   if (branch !== licensesBranch) {
-    const { command, configFilePath } = await utils.getLicensedInput();
-
     // change to a `<branch>-licenses` branch to continue updates
     await utils.ensureBranch(licensesBranch, userBranch);
 
@@ -368,7 +376,7 @@ async function run() {
         pullRequestCreated = true;
       }
 
-      statusResult = await status();
+      statusResult = await utils.checkStatus(command, configFilePath);
       await notifyStatus(octokit, userBranch, userPullRequest, licensesPullRequest, statusResult);
 
       if (userPullRequest) {
@@ -429,20 +437,6 @@ async function commentOnPullRequest(octokit, pullRequest) {
   }
 }
 
-async function status() {
-  const { command, configFilePath } = await utils.getLicensedInput();
-
-  let log = '';
-  const options = {
-    ignoreReturnCode: true,
-    listeners: {
-      stdout: data => log += data.toString()
-    }
-  };
-  const exitCode = await exec.exec(command, ['status', '-c', configFilePath], options);
-  return { success: exitCode === 0, log };
-}
-
 async function run() {
   let licensesUpdated = false;
   const branch = utils.getBranch(github.context);
@@ -452,7 +446,7 @@ async function run() {
   const { command, configFilePath } = await utils.getLicensedInput();
 
   // pre-check, if status succeeds no need to recache
-  let statusResult = await status();
+  let statusResult = await utils.checkStatus(command, configFilePath);
   if (statusResult.success) {
     return;
   }
@@ -494,7 +488,7 @@ async function run() {
   }
 
   // after recaching, check status
-  statusResult = await status();
+  statusResult = await utils.checkStatus(command, configFilePath);
   if (!statusResult.success) {
     throw new Error('Cached metadata checks failed');
   }
