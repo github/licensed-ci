@@ -1,20 +1,19 @@
+const core = require('@actions/core');
+const exec = require('@actions/exec');
 const github = require('@actions/github');
-const { mocks } = require('@jonabc/actions-mocks');
-const os = require('os');
 const path = require('path');
-const sinon = require('sinon').createSandbox();
+const sinon = require('sinon');
 const utils = require('../../lib/utils');
 const workflow = require('../../lib/workflows/push');
 
-const octokit = github.getOctokit('token');
+const processEnv = process.env;
 
 describe('push workflow', () => {
   const token = 'token';
-  const userName = 'user';
-  const userEmail = 'user@example.com';
   const commitMessage = 'commit message';
   const command = 'licensed';
-  const configFile = path.normalize(path.join(__dirname, '..', '..', '.licensed.yml'));
+  const configFilePath = path.normalize(path.join(__dirname, '..', '..', '.licensed.yml'));
+  const cachePaths = ['cache1', 'cache2'];
 
   const branch = 'branch';
 
@@ -22,102 +21,136 @@ describe('push workflow', () => {
   const owner = 'jonabc';
   const repo = 'setup-licensed';
 
-  const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
-  const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
-  const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
-
-  const processEnv = process.env;
-  let outString;
-
-  const contextPayload = github.context.payload;
+  let octokit;
+  let createCommentEndpoint;
 
   beforeEach(() => {
-    process.env = {
-      ...process.env,
-      INPUT_GITHUB_TOKEN: token,
-      INPUT_COMMIT_MESSAGE: commitMessage,
-      INPUT_USER_NAME: userName,
-      INPUT_USER_EMAIL: userEmail,
-      INPUT_COMMAND: command,
-      INPUT_CONFIG_FILE: configFile,
-      GITHUB_REPOSITORY: `${owner}/${repo}`,
+    process.env.INPUT_COMMIT_MESSAGE = commitMessage;
+    process.env.INPUT_CONFIG_FILE = configFilePath;
+    process.env.INPUT_GITHUB_TOKEN = token;
+    process.env.GITHUB_REPOSITORY = `${owner}/${repo}`;
+
+    createCommentEndpoint = sinon.stub();
+    octokit = {
+      issues: {
+        createComment: createCommentEndpoint
+      }
     };
 
-    outString = '';
-    mocks.exec.setLog(log => outString += log + os.EOL);
-    mocks.github.setLog(log => outString += log + os.EOL);
+    // stub core methods
+    sinon.stub(core, 'info');
+    sinon.stub(core, 'warning');
+    sinon.stub(core, 'setOutput');
 
-    sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
-
-    github.context.payload = { ref: `refs/heads/${branch}` };
-
-    mocks.exec.mock([
-      { command: 'licensed env', exitCode: 1 },
-      { command: 'licensed status', exitCode: 1, count: 1 },
-      { command: '', exitCode: 0 }
-    ]);
-
-    mocks.github.mock(
-      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
-    );
-
-    Object.keys(utils).forEach(key => sinon.spy(utils, key));
+    sinon.stub(utils, 'getBranch').returns('branch');
+    sinon.stub(utils, 'getLicensedInput').resolves({ command, configFilePath });
+    sinon.stub(utils, 'ensureBranch').resolves();
+    sinon.stub(utils, 'findPullRequest').resolves(null);
+    sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
+    sinon.stub(github, 'getOctokit').returns(octokit);
+    sinon.stub(exec, 'exec')
+      .rejects()
+      .withArgs(command, ['cache', '-c', configFilePath]).resolves()
+      .withArgs('git', ['add', '--', ...cachePaths]).resolves()
+      .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(0);
+    sinon.stub(utils, 'checkStatus')
+      .onCall(0).resolves({ success: false })
+      .onCall(1).resolves({ success: true });
   });
 
   afterEach(() => {
     sinon.restore();
-    mocks.exec.restore();
     process.env = processEnv;
-    github.context.payload = contextPayload;
   });
 
   it('does not cache data if no changes are needed', async () => {
-    mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
+    utils.checkStatus.reset();
+    utils.checkStatus.resolves({ success: true });
+
     await workflow();
-    expect(outString).toMatch(`${command} status -c ${configFile}`);
-    expect(outString).not.toMatch(`${command} cache -c ${configFile}`);
+    expect(utils.checkStatus.callCount).toEqual(1);
+    expect(utils.checkStatus.getCall(0).args).toEqual([command, configFilePath]);
+    expect(exec.exec.callCount).toEqual(0);
   });
+
+  it('raises an error if github_token is not set', async () => {
+    delete process.env.INPUT_GITHUB_TOKEN;
+    await expect(workflow()).rejects.toThrow(
+      'Input required and not supplied: github_token'
+    );
+  })
 
   it('runs a licensed ci workflow', async () => {
     await workflow();
     expect(utils.getBranch.callCount).toEqual(1);
-    expect(utils.getLicensedInput.callCount).toBeGreaterThan(1);
-    expect(utils.ensureBranch.withArgs(branch, branch).callCount).toEqual(1);
-    expect(outString).toMatch(`git checkout ${branch}`);
-    expect(outString).toMatch(`${command} cache -c ${configFile}`);
-    expect(utils.getCachePaths.callCount).toEqual(1);
-    expect(outString).toMatch(`${command} env`);
-    expect(outString).toMatch('git add -- .');
-    expect(outString).toMatch('git diff-index --quiet HEAD -- .');
+    expect(utils.getBranch.getCall(0).args).toEqual([github.context]);
 
-    // expect branch information set in output
-    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${branch}`));
-    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
+    expect(utils.getLicensedInput.callCount).toEqual(1);
+
+    expect(utils.checkStatus.callCount).toEqual(2);
+    expect(utils.checkStatus.getCall(0).args).toEqual([command, configFilePath]);
+    expect(utils.checkStatus.getCall(1).args).toEqual([command, configFilePath]);
+
+    expect(utils.ensureBranch.callCount).toEqual(1);
+    expect(utils.ensureBranch.getCall(0).args).toEqual([branch, branch]);
+
+    expect(utils.findPullRequest.callCount).toEqual(1);
+    expect(utils.findPullRequest.getCall(0).args).toEqual([octokit, { head: branch }]);
+
+    expect(exec.exec.callCount).toEqual(3);
+    expect(exec.exec.getCall(0).args).toEqual([command, ['cache', '-c', configFilePath]]);
+
+    expect(utils.getCachePaths.callCount).toEqual(1);
+    expect(utils.getCachePaths.getCall(0).args).toEqual([command, configFilePath]);
+
+    expect(exec.exec.getCall(1).args).toEqual(['git', ['add', '--', ...cachePaths]]);
+    expect(exec.exec.getCall(2).args).toEqual(
+      expect.arrayContaining(
+        ['git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]]
+      )
+    );
+
+    expect(createCommentEndpoint.callCount).toEqual(0);
+
+    // expect information set in output
+    expect(core.setOutput.callCount).toEqual(3);
+    expect(core.setOutput.calledWith('licenses_branch', branch)).toEqual(true);
+    expect(core.setOutput.calledWith('user_branch', branch)).toEqual(true);
+    expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
   });
 
   it('fails if status checks fail after caching data', async () => {
-    mocks.exec.mock({ command: 'licensed status', exitCode: 1 });
+    utils.checkStatus.reset();
+    utils.checkStatus.resolves({ success: false });
+
     await expect(workflow()).rejects.toThrow('Cached metadata checks failed');
 
-    // expect branch information set in output
-    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${branch}`));
-    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
+    // expect information set in output
+    expect(core.setOutput.callCount).toEqual(3);
+    expect(core.setOutput.calledWith('licenses_branch', branch)).toEqual(true);
+    expect(core.setOutput.calledWith('user_branch', branch)).toEqual(true);
+    expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
   });
 
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await workflow();
-      expect(outString).not.toMatch(`git push ${utils.getOrigin()} ${branch}`);
-      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*false`));
+      expect(exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), branch])).toEqual(true);
+      expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
     });
   });
 
   describe('with cached file changes', () => {
-    const createCommentEndpoint = octokit.issues.createComment.endpoint({ owner, repo, issue_number: 1 });
-    const createCommentUrl = createCommentEndpoint.url.replace('https://api.github.com', '');
+    const pullRequest = require(path.join(__dirname, '..', 'fixtures', 'pullRequest.json'));
+    const comment = 'Auto updated files';
 
     beforeEach(() => {
-      mocks.exec.mock({ command: 'git diff-index', exitCode: 1 });
+      process.env.INPUT_PR_COMMENT = comment;
+
+      exec.exec
+        .withArgs('licensed').resolves(0)
+        .withArgs('git').resolves(0)
+        .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(1);
     });
 
     it('raises an error when github_token is not given', async () => {
@@ -129,62 +162,43 @@ describe('push workflow', () => {
     });
 
     it('pushes changes to origin', async () => {
-      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult'));
-      mocks.github.mock(
-        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
-      );
-
       await workflow();
-      expect(outString).toMatch(`git commit -m ${commitMessage}`);
-      expect(outString).toMatch(`git push ${utils.getOrigin()} ${branch}`);
-      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*true`));
-    });
-
-    it('does not comment if comment input is not given', async () => {
-      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult'));
-      mocks.github.mock(
-        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
-      );
-
-      await workflow();
-      const query = `is:pr is:open repo:${owner}/${repo} head:"${branch}"`;
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
-      expect(outString).not.toMatch(`POST ${createCommentUrl}`);
+      expect(exec.exec.calledWith('git', ['commit', '-m', commitMessage])).toEqual(true);
+      expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), branch])).toEqual(true);
+      expect(core.setOutput.calledWith('licenses_updated', 'true')).toEqual(true);
     });
 
     it('does not comment if PR is not found', async () => {
-      process.env.INPUT_PR_COMMENT = 'Auto updated files';
+      await workflow();
+      expect(createCommentEndpoint.callCount).toEqual(0);
+    });
 
-      const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult'));
-      mocks.github.mock(
-        { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture }
-      );
+    it('does not comment if comment input is not given', async () => {
+      delete process.env.INPUT_PR_COMMENT;
+      utils.findPullRequest.resolves(pullRequest);
 
       await workflow();
-      const query = `is:pr is:open repo:${owner}/${repo} head:"${branch}"`;
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
-      expect(outString).not.toMatch(`POST ${createCommentUrl}`);
+      expect(createCommentEndpoint.callCount).toEqual(0);
     });
 
     it('comments if input is given and PR is open', async () => {
-      process.env.INPUT_PR_COMMENT = 'Auto updated files';
-
-      mocks.github.mock({ method: 'POST', uri: createCommentUrl });
+      utils.findPullRequest.resolves(pullRequest);
 
       await workflow();
-      const query = `is:pr is:open repo:${owner}/${repo} head:"${branch}"`;
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
-      expect(outString).toMatch(`POST ${createCommentUrl} : ${JSON.stringify({ body: process.env.INPUT_PR_COMMENT})}`);
+      expect(createCommentEndpoint.callCount).toEqual(1);
+      expect(createCommentEndpoint.getCall(0).args).toEqual([{
+        owner,
+        repo,
+        issue_number: pullRequest.number,
+        body: comment
+      }]);
     });
 
     it('sets pr details in step output', async () => {
-      mocks.github.mock([
-        { method: 'POST', uri: createCommentUrl }
-      ]);
-
+      utils.findPullRequest.resolves(pullRequest);
       await workflow();
-      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${searchResultFixture.items[0].html_url}`));
-      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${searchResultFixture.items[0].number}`));
+      expect(core.setOutput.calledWith('pr_url', pullRequest.html_url)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_number', pullRequest.number)).toEqual(true);
     });
   });
 });
