@@ -1,336 +1,328 @@
+const core = require('@actions/core');
+const exec = require('@actions/exec');
 const github = require('@actions/github');
-const { mocks } = require('@jonabc/actions-mocks');
-const os = require('os');
 const path = require('path');
 const sinon = require('sinon');
 const utils = require('../../lib/utils');
 const workflow = require('../../lib/workflows/branch');
 
-const octokit = github.getOctokit('token');
+const processEnv = process.env;
 
 describe('branch workflow', () => {
   const token = 'token';
-  const userName = 'user';
-  const userEmail = 'user@example.com';
   const commitMessage = 'commit message';
   const command = 'licensed';
-  const configFile = path.normalize(path.join(__dirname, '..', '..', '.licensed.yml'));
+  const configFilePath = path.normalize(path.join(__dirname, '..', '..', '.licensed.yml'));
+  const cachePaths = ['cache1', 'cache2'];
 
-  const branch = 'branch-licenses';
-  const parent = 'branch';
+  const branch = 'branch';
+  const licensesBranch = 'branch-licenses';
 
-  // to match the response from the testSearchResult.json fixture
+  const pullRequest = require(path.normalize(path.join(__dirname, '..', 'fixtures', 'pullRequest.json')));
+
   const owner = 'jonabc';
-  const repo = 'setup-licensed';
+  const repo = 'licensed-ci';
 
-  let outString;
-  const processEnv = process.env;
-
-  const issuesSearchEndpoint = octokit.search.issuesAndPullRequests.endpoint();
-  const issuesSearchUrl = issuesSearchEndpoint.url.replace('https://api.github.com', '');
-  const searchResultFixture = require(path.join(__dirname, '..', 'fixtures', 'testSearchResult'));
-
-  const pullRequest = searchResultFixture.items[0];
-  const closedPullRequest = { ...pullRequest, state: 'closed' };
-  const updatePullsEndpoint = octokit.pulls.update.endpoint({ owner, repo, pull_number: pullRequest.number });
-  const updatePullsUrl = updatePullsEndpoint.url.replace('https://api.github.com', '');
-
-  const contextPayload = github.context.payload;
+  let octokit;
+  let createCommentEndpoint;
+  let requestReviewersEndpoint;
+  let createPullRequestEndpoint;
 
   beforeEach(() => {
-    process.env = {
-      ...process.env,
-      INPUT_GITHUB_TOKEN: token,
-      INPUT_COMMIT_MESSAGE: commitMessage,
-      INPUT_USER_NAME: userName,
-      INPUT_USER_EMAIL: userEmail,
-      INPUT_COMMAND: command,
-      INPUT_CONFIG_FILE: configFile,
-      INPUT_CLEANUP_ON_SUCCESS: 'false',
-      GITHUB_REPOSITORY: `${owner}/${repo}`,
-      GITHUB_ACTOR: 'actor'
+    process.env.INPUT_GITHUB_TOKEN = token,
+    process.env.INPUT_COMMIT_MESSAGE = commitMessage,
+    process.env.INPUT_CLEANUP_ON_SUCCESS = 'false',
+    process.env.GITHUB_REPOSITORY = `${owner}/${repo}`,
+    process.env.GITHUB_ACTOR = 'actor'
+
+    createCommentEndpoint = sinon.stub();
+    requestReviewersEndpoint = sinon.stub();
+    createPullRequestEndpoint = sinon.stub();
+    octokit = {
+      issues: {
+        createComment: createCommentEndpoint
+      },
+      pulls: {
+        create: createPullRequestEndpoint,
+        requestReviewers: requestReviewersEndpoint
+      }
     };
 
-    outString = '';
-    mocks.exec.setLog(log => outString += log + os.EOL);
-    mocks.github.setLog(log => outString += log + os.EOL);
+    // stub core methods
+    sinon.stub(core, 'info');
+    sinon.stub(core, 'warning');
+    sinon.stub(core, 'setOutput');
 
-    sinon.stub(process.stdout, 'write').callsFake(log => outString += log);
-    github.context.payload = { ref: `refs/heads/${parent}` };
-
-    mocks.exec.mock([
-      { command: 'licensed env', exitCode: 1 },
-      { command: 'licensed status', exitCode: 1 },
-      { command: '', exitCode: 0 }
-    ]);
-
-    mocks.github.mock([
-      { method: 'GET', uri: issuesSearchUrl, response: searchResultFixture },
-      { method: 'PATCH', uri: updatePullsUrl, response: closedPullRequest }
-    ]);
-
-    Object.keys(utils).forEach(key => sinon.spy(utils, key));
+    sinon.stub(utils, 'getBranch').returns(branch);
+    sinon.stub(utils, 'getLicensedInput').resolves({ command, configFilePath });
+    sinon.stub(utils, 'ensureBranch').resolves();
+    sinon.stub(utils, 'findPullRequest').resolves(null);
+    sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
+    sinon.stub(github, 'getOctokit').returns(octokit);
+    sinon.stub(exec, 'exec')
+      .resolves(1)
+      .withArgs('git', ['merge', '-s', 'recursive', '-Xtheirs', `origin/${branch}`]).resolves(0)
+      .withArgs(command, ['cache', '-c', configFilePath]).resolves()
+      .withArgs('git', ['add', '--', ...cachePaths]).resolves()
+      .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(0);
+    sinon.stub(utils, 'checkStatus')
+      .onCall(0).resolves({ success: false })
+      .onCall(1).resolves({ success: true, log: 'licenses-success' });
   });
 
   afterEach(() => {
     process.env = processEnv;
     sinon.restore();
-    mocks.exec.restore();
-    mocks.github.restore();
-
-    github.context.payload = contextPayload;
   });
 
   it('does not cache data if no changes are needed', async () => {
-    mocks.exec.mock({ command: 'licensed status', exitCode: 0 })
+    utils.checkStatus.reset();
+    utils.checkStatus.resolves({ success: true });
+
     await workflow();
-    expect(outString).toMatch(`${command} status -c ${configFile}`);
-    expect(outString).not.toMatch(`${command} cache -c ${configFile}`);
+    expect(utils.checkStatus.callCount).toEqual(1);
+    expect(utils.checkStatus.getCall(0).args).toEqual([command, configFilePath]);
+    expect(exec.exec.callCount).toEqual(0);
   });
 
   it('runs a licensed ci workflow', async () => {
     await expect(workflow()).rejects.toThrow('Cached metadata checks failed');
     expect(utils.getBranch.callCount).toEqual(1);
-    expect(utils.getLicensedInput.callCount).toBeGreaterThan(1);
-    expect(utils.ensureBranch.withArgs(branch, parent).callCount).toEqual(1);
-    expect(outString).toMatch(`git merge -s recursive -Xtheirs origin/${parent}`);
-    expect(outString).toMatch(`${command} cache -c ${configFile}`);
-    expect(utils.getCachePaths.callCount).toEqual(1);
-    expect(outString).toMatch(`${command} env`);
-    expect(outString).toMatch('git add -- .');
-    expect(outString).toMatch('git diff-index --quiet HEAD -- .');
-    expect(outString).toMatch(`git checkout ${parent}`);
+    expect(utils.getBranch.getCall(0).args).toEqual([github.context]);
 
-    // expect branch information set in output
-    expect(outString).toMatch(new RegExp(`set-output.*user_branch.*${parent}`));
-    expect(outString).toMatch(new RegExp(`set-output.*licenses_branch.*${branch}`));
+    expect(utils.getLicensedInput.callCount).toEqual(1);
+
+    expect(utils.checkStatus.callCount).toEqual(1);
+    expect(utils.checkStatus.getCall(0).args).toEqual([command, configFilePath]);
+
+    expect(utils.ensureBranch.callCount).toEqual(1);
+    expect(utils.ensureBranch.getCall(0).args).toEqual([licensesBranch, branch]);
+
+    expect(utils.findPullRequest.callCount).toEqual(1);
+    expect(utils.findPullRequest.getCall(0).args).toEqual([octokit, { head: licensesBranch, base: branch }]);
+
+    expect(exec.exec.callCount).toEqual(5);
+    expect(exec.exec.getCall(0).args).toEqual([
+      'git',
+      ['merge', '-s', 'recursive', '-Xtheirs', `origin/${branch}`],
+      { ignoreReturnCode: true }
+    ]);
+    expect(exec.exec.getCall(1).args).toEqual([command, ['cache', '-c', configFilePath]]);
+
+    expect(utils.getCachePaths.callCount).toEqual(1);
+    expect(utils.getCachePaths.getCall(0).args).toEqual([command, configFilePath]);
+
+    expect(exec.exec.getCall(2).args).toEqual(['git', ['add', '--', ...cachePaths]]);
+    expect(exec.exec.getCall(3).args).toEqual([
+      'git',
+      ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths],
+      { ignoreReturnCode: true }
+    ]);
+
+    expect(exec.exec.getCall(4).args).toEqual(['git', ['checkout', branch]]);
+
+    expect(createCommentEndpoint.callCount).toEqual(0);
+    expect(createPullRequestEndpoint.callCount).toEqual(0);
+    expect(requestReviewersEndpoint.callCount).toEqual(0);
+
+    // expect information set in output
+    expect(core.setOutput.callCount).toEqual(3);
+    expect(core.setOutput.calledWith('licenses_branch', licensesBranch)).toEqual(true);
+    expect(core.setOutput.calledWith('user_branch', branch)).toEqual(true);
+    expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
   });
 
   it('does not cache metadata on licenses branch', async () => {
-    github.context.payload.ref = `refs/heads/${branch}`;
+    utils.getBranch.reset();
+    utils.getBranch.returns(licensesBranch);
+
     await expect(workflow()).rejects.toThrow();
+
     expect(utils.getBranch.callCount).toEqual(1);
+    expect(utils.findPullRequest.callCount).toEqual(1);
     expect(utils.getLicensedInput.callCount).toEqual(1);
+    expect(utils.checkStatus.callCount).toEqual(1);
+
     expect(utils.ensureBranch.callCount).toEqual(0);
-    expect(outString).not.toMatch(`${command} cache -c ${configFile}`);
-    expect(utils.getCachePaths.callCount).toEqual(0);
-    expect(outString).not.toMatch(`${command} env`);
-    expect(outString).not.toMatch('git add -- .');
-    expect(outString).not.toMatch('git diff-index --quiet HEAD -- .');
+    expect(exec.exec.callCount).toEqual(0);
+
+    expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
   });
 
   it('cleans pull request and branch if status checks succeed on parent', async () => {
     process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
-    mocks.exec.mock([
-      { command: 'licensed status', exitCode: 0 },
-      { command: 'git ls-remote', exitCode: 0 },
-      { command: 'git push', exitCode: 0 }
-    ]);
+    utils.checkStatus.onCall(0).resolves({ success: true });
+    sinon.stub(utils, 'closePullRequest').resolves();
+    sinon.stub(utils, 'deleteBranch').resolves();
+    utils.findPullRequest.resolves(pullRequest);
 
     await workflow();
 
     expect(utils.closePullRequest.callCount).toEqual(1);
-    expect(outString).toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
+    expect(utils.closePullRequest.getCall(0).args).toEqual([octokit, pullRequest]);
+
     expect(utils.deleteBranch.callCount).toEqual(1);
-    expect(outString).toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
-    expect(outString).toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+    expect(utils.deleteBranch.getCall(0).args).toEqual([licensesBranch]);
   });
 
   it('does not cleanup if flag input is not true', async () => {
-    mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
+    utils.checkStatus.onCall(0).resolves({ success: true });
+    sinon.stub(utils, 'closePullRequest').resolves();
+    sinon.stub(utils, 'deleteBranch').resolves();
 
     await workflow();
 
     expect(utils.closePullRequest.callCount).toEqual(0);
-    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
     expect(utils.deleteBranch.callCount).toEqual(0);
-    expect(outString).not.toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
-    expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
   });
 
   it('does not clean pull request and branch if status check succeeds on licenses branch', async () => {
-    github.context.payload.ref = `refs/heads/${branch}`;
+    utils.getBranch.reset();
+    utils.getBranch.returns(licensesBranch);
     process.env.INPUT_CLEANUP_ON_SUCCESS = 'true';
-    mocks.exec.mock({ command: 'licensed status', exitCode: 0 });
+    utils.checkStatus.onCall(0).resolves({ success: true });
+    sinon.stub(utils, 'closePullRequest').resolves();
+    sinon.stub(utils, 'deleteBranch').resolves();
 
     await workflow();
 
     expect(utils.closePullRequest.callCount).toEqual(0);
-    expect(outString).not.toMatch(`PATCH ${updatePullsUrl} : ${JSON.stringify({ state: 'closed' })}`);
     expect(utils.deleteBranch.callCount).toEqual(0);
-    expect(outString).not.toMatch(`git ls-remote --exit-code ${utils.getOrigin()} ${branch}`);
-    expect(outString).not.toMatch(`git push ${utils.getOrigin()} --delete ${branch}`);
+  });
+
+  it('raises an error when github_token is not given', async () => {
+    delete process.env.INPUT_GITHUB_TOKEN;
+
+    await expect(workflow()).rejects.toThrow(
+      'Input required and not supplied: github_token'
+    );
   });
 
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
-      expect(outString).not.toMatch(`git push ${utils.getOrigin()} ${branch}`);
-      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*false`));
+      expect(exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), branch])).toEqual(true);
+      expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
     });
   });
 
   describe('with cached file changes', () => {
-    const licensesPullRequest = require(path.join(__dirname, '..', 'fixtures', 'pullRequest'));
-
-    const createPREndpoint = octokit.pulls.create.endpoint({ owner, repo });
-    const createPRUrl = createPREndpoint.url.replace('https://api.github.com', '');
-    const createReviewRequestEndpoint = octokit.pulls.requestReviewers.endpoint({ owner, repo, pull_number: licensesPullRequest.number });
-    const createReviewRequestUrl = createReviewRequestEndpoint.url.replace('https://api.github.com', '');
-
-    const createLicensesPRCommentEndpoint = octokit.issues.createComment.endpoint({ owner, repo, issue_number: licensesPullRequest.number });
-    const createLicensesPRCommentUrl = createLicensesPRCommentEndpoint.url.replace('https://api.github.com', '');
-
-    const createUserPRCommentEndpoint = octokit.issues.createComment.endpoint({ owner, repo, issue_number: pullRequest.number });
-    const createUserPRCommentUrl = createUserPRCommentEndpoint.url.replace('https://api.github.com', '');
-
-    const emptySearchResult = require(path.join(__dirname, '..', 'fixtures', 'emptySearchResult'));
+    const licensesPullRequest = {
+      ...pullRequest,
+      id: pullRequest.id + 1,
+      number: pullRequest.number + 1,
+      html_url: pullRequest.html_url.replace(pullRequest.number, pullRequest.number + 1)
+    };
 
     beforeEach(() => {
-      mocks.exec.mock([
-        { command: 'licensed status', exitCode: 1, count: 1 },
-        { command: 'licensed status', exitCode: 0, stdout: 'licenses-success' },
-        { command: 'git diff-index', exitCode: 1 }
-      ]);
-      mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: { items: [licensesPullRequest] } },
-        { method: 'POST', uri: createLicensesPRCommentUrl },
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: emptySearchResult },
-        { method: 'POST', uri: createUserPRCommentUrl }
-      ]);
-    });
+      exec.exec
+        .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(1)
+        .withArgs('git', ['commit', '-m', commitMessage]).resolves()
+        .withArgs('git', ['push', utils.getOrigin(), licensesBranch]).resolves();
 
-    it('raises an error when github_token is not given', async () => {
-      delete process.env.INPUT_GITHUB_TOKEN;
-
-      await expect(workflow()).rejects.toThrow(
-        'Input required and not supplied: github_token'
-      );
+      utils.findPullRequest
+        .withArgs(octokit, { head: licensesBranch, base: branch }).resolves(licensesPullRequest)
+        .withArgs(octokit, { head: branch, "-base": branch }).resolves(pullRequest);
     });
 
     it('pushes changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
-      expect(outString).toMatch(`git commit -m ${commitMessage}`);
-      expect(outString).toMatch(`git push ${utils.getOrigin()} ${branch}`);
-      expect(outString).toMatch(new RegExp(`set-output.*licenses_updated.*true`));
+      expect(exec.exec.calledWith('git', ['commit', '-m', commitMessage])).toEqual(true);
+      expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), licensesBranch])).toEqual(true);
+      expect(core.setOutput.calledWith('licenses_updated', 'true')).toEqual(true);
     });
 
-    it('opens a PR for changes', async () => {
-      process.env.INPUT_PR_COMMENT = 'pr_comment';
-      mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: emptySearchResult },
-        { method: 'POST', uri: createPRUrl, response: licensesPullRequest },
-        { method: 'POST', url: createReviewRequestUrl }
-      ]);
+    it("opens a PR for changes if one doesn't exist", async () => {
+      utils.findPullRequest.withArgs(octokit, { head: licensesBranch, base: branch }).resolves(null);
+      createPullRequestEndpoint.resolves({ data: licensesPullRequest });
 
       await expect(workflow()).rejects.toThrow();
-      let query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${branch}" base:"${parent}"`;
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
+      expect(utils.findPullRequest.calledWith(octokit, { head: licensesBranch, base: branch })).toEqual(true);
+      expect(createPullRequestEndpoint.callCount).toEqual(1);
+      expect(createPullRequestEndpoint.getCall(0).args).toEqual([{
+        owner,
+        repo,
+        title: `License updates for ${branch}`,
+        head: licensesBranch,
+        base: branch,
+        body: expect.stringMatching(branch)
+      }]);
 
-      let match = outString.match(`POST ${createPRUrl} : (.+)`);
-      expect(match).toBeTruthy();
-      let body = JSON.parse(match[1]);
-      expect(body.head).toEqual(branch);
-      expect(body.base).toEqual(parent);
-      // minimal expectations about PR body template substitutions
-      expect(body.body).toMatch(parent);
-
-      match = outString.match(`POST ${createReviewRequestUrl} : (.+)`);
-      expect(match).toBeTruthy();
-      body = JSON.parse(match[1]);
-      expect(body.reviewers).toEqual([process.env.GITHUB_ACTOR]);
+      expect(requestReviewersEndpoint.callCount).toEqual(1);
+      expect(requestReviewersEndpoint.getCall(0).args).toEqual([{
+        owner,
+        repo,
+        pull_number: licensesPullRequest.number,
+        reviewers: [process.env.GITHUB_ACTOR]
+      }]);
 
       // expect pr information set in output
-      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${licensesPullRequest.html_url}`));
-      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${licensesPullRequest.number}`));
-      expect(outString).toMatch(new RegExp('set-output.*pr_created.*true'));
+      expect(core.setOutput.calledWith('pr_url', licensesPullRequest.html_url)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_number', licensesPullRequest.number)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_created', 'true')).toEqual(true);
     });
 
     it('does not open a PR for changes if it exists', async () => {
-      mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: { items: [licensesPullRequest] } }
-      ]);
-
       await expect(workflow()).rejects.toThrow();
-      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${branch}" base:"${parent}"`
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
-      expect(outString).not.toMatch(`POST ${createPRUrl}`);
+      expect(createPullRequestEndpoint.callCount).toEqual(0);
+      expect(requestReviewersEndpoint.callCount).toEqual(0);
 
       // expect pr information set in output
-      expect(outString).toMatch(new RegExp(`set-output.*pr_url.*${licensesPullRequest.html_url}`));
-      expect(outString).toMatch(new RegExp(`set-output.*pr_number.*${licensesPullRequest.number}`));
-      expect(outString).toMatch(new RegExp('set-output.*pr_created.*false'));
+      expect(core.setOutput.calledWith('pr_url', licensesPullRequest.html_url)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_number', licensesPullRequest.number)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_created', 'false')).toEqual(true);
     });
 
     it('links the created PR to the parent branch', async () => {
-      mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: emptySearchResult },
-        { method: 'POST', uri: createPRUrl, response: licensesPullRequest },
-        { method: 'POST', url: createReviewRequestUrl }
-      ]);
+      utils.findPullRequest.withArgs(octokit, { head: licensesBranch, base: branch }).resolves(null);
+      createPullRequestEndpoint.resolves({ data: licensesPullRequest });
 
       await expect(workflow()).rejects.toThrow();
-
-      let match = outString.match(`POST ${createPRUrl} : (.+)`);
-      expect(match).toBeTruthy();
-      let body = JSON.parse(match[1]);
-      expect(body.body).toMatch(`[branch](https://github.com/${owner}/${repo}/tree/${parent})`);
+      let prBody = createPullRequestEndpoint.getCall(0).args[0].body;
+      expect(prBody).toMatch(`[branch](https://github.com/${owner}/${repo}/tree/${branch}`);
     });
 
     it('links the created PR to the parent PR if it exists', async () => {
-      mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${branch}%22`, response: emptySearchResult },
-        { method: 'POST', uri: createPRUrl, response: licensesPullRequest },
-        { method: 'POST', url: createReviewRequestUrl },
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: { items: [pullRequest] } }
-      ]);
+      utils.findPullRequest.withArgs(octokit, { head: licensesBranch, base: branch }).resolves(null);
+      createPullRequestEndpoint.resolves({ data: licensesPullRequest });
 
       await expect(workflow()).rejects.toThrow();
-
-      let match = outString.match(`POST ${createPRUrl} : (.+)`);
-      expect(match).toBeTruthy();
-      let body = JSON.parse(match[1]);
-      expect(body.body).toMatch(`[PR](${pullRequest.html_url})`);
+      let prBody = createPullRequestEndpoint.getCall(0).args[0].body;
+      expect(prBody).toMatch(`[PR](${pullRequest.html_url})`);
     });
 
     it('adds a comment to the parent PR if it exists', async () => {
-      mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: { items: [pullRequest] } }
-      ]);
-
       await expect(workflow()).rejects.toThrow();
-      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${parent}" -base:"${parent}"`;
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)} :`);
+      const createCommentArgs = createCommentEndpoint.args.find(args =>
+        args[0].issue_number == pullRequest.number
+      );
 
-      const match = outString.match(`POST ${createUserPRCommentUrl} : (.+)`);
-      expect(match).toBeTruthy();
-      const body = JSON.parse(match[1]);
-      expect(body.body).toMatch('The `licensed-ci` GitHub Action has updated');
-      expect(body.body).toMatch(licensesPullRequest.html_url);
+      expect(createCommentArgs).toBeDefined();
+      expect(createCommentArgs[0].body).toMatch('The `licensed-ci` GitHub Action has updated');
+      expect(createCommentArgs[0].body).toMatch(licensesPullRequest.html_url);
+      expect(createCommentArgs[0].owner).toEqual(owner);
+      expect(createCommentArgs[0].repo).toEqual(repo);
     });
 
     it('does not add a comment to the parent PR if it does not exist', async () => {
-      mocks.github.mock([
-        { method: 'GET', uri: `${issuesSearchUrl}.*head%3A%22${parent}%22`, response: { items: [] } }
-      ]);
+      utils.findPullRequest.withArgs(octokit, { head: branch, "-base": branch }).resolves(null);
 
       await expect(workflow()).rejects.toThrow();
-
-      const query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY} head:"${parent}"`;
-      expect(outString).toMatch(`GET ${issuesSearchUrl}?q=${encodeURIComponent(query)}`);
-
-      expect(outString).not.toMatch(`POST ${createUserPRCommentUrl} : (.+)`);
+      expect(createCommentEndpoint.calledWith({ owner, repo, issue_number: pullRequest.number })).toEqual(false);
     });
 
     it('adds a status comment to the licenses PR', async () => {
       await expect(workflow()).rejects.toThrow();
+      const createCommentArgs = createCommentEndpoint.args.find(args =>
+        args[0].issue_number == licensesPullRequest.number
+      );
 
-      const match = outString.match(`POST ${createLicensesPRCommentUrl} : (.+)`);
-      expect(match).toBeTruthy();
-      const body = JSON.parse(match[1]);
-      expect(body.body).toMatch('`licensed status` result')
-      expect(body.body).toMatch('succeeded');
-      expect(body.body).toMatch('licenses-success');
+      expect(createCommentArgs).toBeDefined();
+      expect(createCommentArgs[0].body).toMatch('`licensed status` result');
+      expect(createCommentArgs[0].body).toMatch('succeeded');
+      expect(createCommentArgs[0].body).toMatch('licenses-success');
+      expect(createCommentArgs[0].owner).toEqual(owner);
+      expect(createCommentArgs[0].repo).toEqual(repo);
     });
   });
 });
