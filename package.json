@@ -29,7 +29,6 @@
     "@actions/io": "^1.0.1"
   },
   "devDependencies": {
-    "@jonabc/actions-mocks": "^1.1.1",
     "@vercel/ncc": "^0.27",
     "acorn": "^6.0",
     "eslint": "^6.3.0",
