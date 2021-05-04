@@ -47,6 +47,7 @@ describe('push workflow', () => {
     sinon.stub(utils, 'ensureBranch').resolves();
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
+    sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
     sinon.stub(github, 'getOctokit').returns(octokit);
     sinon.stub(exec, 'exec')
       .rejects()
@@ -102,6 +103,9 @@ describe('push workflow', () => {
 
     expect(utils.getCachePaths.callCount).toEqual(1);
     expect(utils.getCachePaths.getCall(0).args).toEqual([command, configFilePath]);
+
+    expect(utils.filterCachePaths.callCount).toEqual(1);
+    expect(utils.filterCachePaths.getCall(0).args).toEqual([cachePaths]);
 
     expect(exec.exec.getCall(1).args).toEqual(['git', ['add', '--', ...cachePaths]]);
     expect(exec.exec.getCall(2).args).toEqual(

@@ -45,7 +45,7 @@ module.exports = run;
 
 const core = __nccwpck_require__(2186);
 const exec = __nccwpck_require__(1514);
-const fs = __nccwpck_require__(5747).promises;
+const fs = __nccwpck_require__(5747);
 const github = __nccwpck_require__(5438);
 const io = __nccwpck_require__(7436);
 const stream = __nccwpck_require__(2413);
@@ -67,7 +67,7 @@ async function getLicensedInput() {
   await io.which(command.split(' ')[0], true); // check that command is runnable
 
   const configFilePath = core.getInput('config_file', { required: true });
-  await fs.access(configFilePath); // check that config file exists
+  await fs.promises.access(configFilePath); // check that config file exists
 
   return { command, configFilePath };
 }
@@ -115,6 +115,16 @@ async function getCachePaths(command, configFilePath) {
 
   // if `licensed env` failed or there was no output, add updated files for the whole repo
   return ['.'];
+}
+
+async function filterCachePaths(paths) {
+  const filteredPaths = await Promise.all(paths.map(path => 
+    // exclude paths that don't exist
+    fs.promises.access(path, fs.constants.R_OK)
+               .then(() => path)
+               .catch(() => null)
+  ));
+  return filteredPaths.filter(p=>p);
 }
 
 async function ensureBranch(branch, parent) {
@@ -171,6 +181,7 @@ module.exports = {
   getLicensedInput,
   getBranch,
   getCachePaths,
+  filterCachePaths,
   ensureBranch,
   findPullRequest,
   closePullRequest,
@@ -359,7 +370,7 @@ async function run() {
 
     // stage any changes, checking only configured cache paths if possible
     const cachePaths = await utils.getCachePaths(command, configFilePath);
-    await exec.exec('git', ['add', '--', ...cachePaths]);
+    await exec.exec('git', ['add', '--', ...(await utils.filterCachePaths(cachePaths))]);
 
     // check for any changes, checking only configured cache paths if possible
     exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths], { ignoreReturnCode: true });
@@ -463,7 +474,7 @@ async function run() {
 
   // stage any changes, checking only configured cache paths if possible
   const cachePaths = await utils.getCachePaths(command, configFilePath);
-  await exec.exec('git', ['add', '--', ...cachePaths]);
+  await exec.exec('git', ['add', '--', ...(await utils.filterCachePaths(cachePaths))]);
 
   // check for any changes, checking only configured cache paths if possible
   const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths], { ignoreReturnCode: true });
