@@ -1,4 +1,5 @@
 const exec = require('@actions/exec');
+const fs = require('fs');
 const path = require('path');
 const sinon = require('sinon');
 const utils = require('../lib/utils');
@@ -159,13 +160,26 @@ describe('getBranch', () => {
 describe('getCachePaths', () => {
   const command = 'licensed';
   const configFile = path.resolve(__dirname, '..', '.licensed.yml');
+  const env = {
+    apps: [
+      { cache_path: 'project/licenses' },
+      { cache_path: 'test/licenses' }
+    ]
+  };
+
+  beforeEach(() => {
+    sinon.stub(exec, 'exec').callsFake((command, args, options) => {
+      options.listeners.stdout(JSON.stringify(env));
+      return Promise.resolve(0);
+    });
+  });
 
   afterEach(() => {
     sinon.restore()
   });
 
   it('calls licensed env', async () => {
-    sinon.stub(exec, 'exec').resolves(1);
+    exec.exec.resolves(1);
 
     await utils.getCachePaths(command, configFile);
     expect(exec.exec.callCount).toEqual(1);
@@ -177,27 +191,32 @@ describe('getCachePaths', () => {
   });
 
   it('returns default paths if licensed env is not available', async () => {
-    sinon.stub(exec, 'exec').resolves(1);
+    exec.exec.resolves(1);
 
     const cachePaths = await utils.getCachePaths(command, configFile);
     expect(cachePaths).toEqual(['.']);
   });
 
   it('returns parsed cache paths from licensed env', async () => {
-    const env = {
-      apps: [
-        { cache_path: 'project/licenses' },
-        { cache_path: 'test/licenses' }
-      ]
-    };
-
-    sinon.stub(exec, 'exec').callsFake((command, args, options) => {
-      options.listeners.stdout(JSON.stringify(env));
-      return Promise.resolve(0);
-    });
-
     const cachePaths = await utils.getCachePaths(command, configFile);
     expect(cachePaths).toEqual(['project/licenses', 'test/licenses']);
+  });
+});
+
+describe('filterCachePaths', () => {
+  const cachePaths = ['project/licenses', 'test/licenses'];
+  beforeEach(() => {
+    sinon.stub(fs.promises, 'access').resolves();
+  });
+
+  afterEach(() => {
+    sinon.restore();
+  });
+
+  it('filters out non-existant cache paths', async () => {
+    fs.promises.access.withArgs(cachePaths[0], fs.constants.R_OK).rejects();
+    const filteredPaths = await utils.filterCachePaths(cachePaths);
+    expect(filteredPaths).toEqual(cachePaths.slice(1));
   });
 });
 
