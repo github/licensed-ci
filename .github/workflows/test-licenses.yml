@@ -2,9 +2,10 @@ name: "Run licensed in test"
 on:
   push:
     branches:
-      - '**'
+      - 'master'
     tags-ignore:
       - '**'
+  pull_request:
 
 jobs:
   licensed_ci:
