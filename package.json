@@ -23,19 +23,19 @@
   },
   "homepage": "https://github.com/jonabc/licensed-ci#readme",
   "dependencies": {
-    "@actions/core": "^1.2.6",
-    "@actions/exec": "^1.0.1",
-    "@actions/github": "^4.0",
-    "@actions/io": "^1.0.1"
+    "@actions/core": "^1.5.0",
+    "@actions/exec": "^1.1.0",
+    "@actions/github": "^5.0",
+    "@actions/io": "^1.1.1"
   },
   "devDependencies": {
-    "@vercel/ncc": "^0.27",
-    "acorn": "^6.0",
-    "eslint": "^6.3.0",
-    "husky": "^4.2.5",
-    "jest": "^26.0",
-    "nock": "^11.3.5",
-    "sinon": "^7.4.2"
+    "@vercel/ncc": "^0.29",
+    "acorn": "^8.4",
+    "eslint": "^7.32.0",
+    "husky": "^7.0.1",
+    "jest": "^27.0",
+    "nock": "^13.1.2",
+    "sinon": "^11.1.2"
   },
   "husky": {
     "hooks": {
