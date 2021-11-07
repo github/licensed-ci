@@ -303,8 +303,10 @@ describe('findPullRequest', () => {
     process.env.GITHUB_REPOSITORY = 'jonabc/licensed-ci';
     endpoint = sinon.stub().resolves({ data: searchResultFixture });
     octokit = {
-      search: {
-        issuesAndPullRequests: endpoint
+      rest: {
+        search: {
+          issuesAndPullRequests: endpoint
+        }
       }
     };
   })
@@ -357,7 +359,7 @@ describe('closePullRequest', () => {
     };
 
     endpoint = sinon.stub().resolves({ data: closedPullRequest });
-    octokit = { pulls: { update: endpoint } };
+    octokit = { rest: { pulls: { update: endpoint } } };
   })
 
   afterEach(() => {
