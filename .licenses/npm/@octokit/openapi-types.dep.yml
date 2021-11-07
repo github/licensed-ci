@@ -1,0 +1,11 @@
+---
+name: "@octokit/openapi-types"
+version: 9.7.0
+type: npm
+summary: Generated TypeScript definitions based on GitHub's OpenAPI spec for api.github.com
+homepage: https://github.com/octokit/openapi-types.ts#readme
+license: mit
+licenses:
+- sources: README.md
+  text: "[MIT](LICENSE)"
+notices: []
