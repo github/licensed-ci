@@ -15,7 +15,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test:
+  licensed:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -26,7 +26,7 @@ jobs:
     - run: npm install --production --ignore-scripts
     - uses: jonabc/setup-licensed@v1
       with:
-        version: '2.x'
+        version: '3.x'
     - uses: ./
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
