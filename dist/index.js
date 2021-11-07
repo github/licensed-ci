@@ -210,7 +210,7 @@ async function createLicensesPullRequest(octokit, head, base, userPullRequest) {
   const body = PULL_REQUEST_TEMPLATE.replace('<base>', base)
                                     .replace('<links>', links);
 
-  const { data: pull } = await octokit.pulls.create({
+  const { data: pull } = await octokit.rest.pulls.create({
     ...github.context.repo,
     title: `License updates for ${base}`,
     head,
@@ -218,7 +218,7 @@ async function createLicensesPullRequest(octokit, head, base, userPullRequest) {
     body
   });
 
-  await octokit.pulls.requestReviewers({
+  await octokit.rest.pulls.requestReviewers({
     ...github.context.repo,
     pull_number: pull.number,
     reviewers: [actor]
@@ -274,7 +274,7 @@ async function notifyStatus(octokit, userBranch, userPullRequest, licensesPullRe
                                      .replace('<base>', userBranch)
                                      .replace('<links>', links);
 
-  await octokit.issues.createComment({
+  await octokit.rest.issues.createComment({
    ...github.context.repo,
    issue_number: licensesPullRequest.number,
    body,
@@ -298,7 +298,7 @@ async function notifyUser(octokit, userPullRequest, licensesPullRequest, created
   const body = NOTIFY_USER_TEMPLATE.replace('<pr url>', licensesPullRequest.html_url)
                                    .replace('<action>', ACTIONS[created]);
 
-  await octokit.issues.createComment({
+  await octokit.rest.issues.createComment({
    ...github.context.repo,
    issue_number: userPullRequest.number,
    body,
@@ -429,7 +429,7 @@ async function commentOnPullRequest(octokit, pullRequest) {
     core.info(`Adding comment ${comment}`);
     core.warning('"pr_comment" is deprecated.  Please use the "pr_url" and "pr_number" step outputs to script actions on an available pull request.');
 
-    await octokit.issues.createComment({
+    await octokit.rest.issues.createComment({
       ...github.context.repo,
       issue_number: pullRequest.number,
       body: comment,
