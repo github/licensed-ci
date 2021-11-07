@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - run: npm install --production
+    - run: npm install --production --ignore-scripts
     - uses: jonabc/setup-licensed@v1
       with:
         version: '2.x'
