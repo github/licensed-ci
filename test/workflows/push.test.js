@@ -32,8 +32,10 @@ describe('push workflow', () => {
 
     createCommentEndpoint = sinon.stub();
     octokit = {
-      issues: {
-        createComment: createCommentEndpoint
+      rest: {
+        issues: {
+          createComment: createCommentEndpoint
+        }
       }
     };
 

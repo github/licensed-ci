@@ -1,0 +1,34 @@
+name: Verify cached license metadata
+
+on:
+  # run on pushes to main
+  push:
+    branches:
+      - main
+  # run on all pull request events
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+  # run on demand
+  workflow_dispatch:
+
+jobs:
+  licensed:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        ref: ${{github.ref}} # checkout branch not SHA
+        fetch-depth: 0
+
+    - run: npm install --production --ignore-scripts
+    - uses: jonabc/setup-licensed@v1
+      with:
+        version: '3.x'
+    - uses: ./
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        config_file: .licensed.release.yml
+        workflow: branch

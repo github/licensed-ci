@@ -39,12 +39,14 @@ describe('branch workflow', () => {
     requestReviewersEndpoint = sinon.stub();
     createPullRequestEndpoint = sinon.stub();
     octokit = {
-      issues: {
-        createComment: createCommentEndpoint
-      },
-      pulls: {
-        create: createPullRequestEndpoint,
-        requestReviewers: requestReviewersEndpoint
+      rest: {
+        issues: {
+          createComment: createCommentEndpoint
+        },
+        pulls: {
+          create: createPullRequestEndpoint,
+          requestReviewers: requestReviewersEndpoint
+        }
       }
     };
 
