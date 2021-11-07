@@ -6,7 +6,8 @@
   "scripts": {
     "lint": "eslint lib test",
     "test": "npm run lint && jest",
-    "package": "ncc build lib/index.js -o dist"
+    "package": "ncc build lib/index.js -o dist",
+    "prepare": "husky install"
   },
   "repository": {
     "type": "git",
@@ -36,10 +37,5 @@
     "jest": "^27.3",
     "nock": "^13.1.4",
     "sinon": "^11.1.2"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "npm run package && git add dist"
-    }
   }
 }
