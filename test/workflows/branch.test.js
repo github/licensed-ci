@@ -61,6 +61,7 @@ describe('branch workflow', () => {
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
     sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
+    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([])
     sinon.stub(github, 'getOctokit').returns(octokit);
     sinon.stub(exec, 'exec')
       .resolves(1)

@@ -48,7 +48,34 @@ async function configureGit() {
 
   await exec.exec('git', ['config', 'user.name', userName]);
   await exec.exec('git', ['config', 'user.email', userEmail]);
-  await exec.exec('git', ['remote', 'add', ORIGIN, `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`]);
+  await exec.exec('git', ['remote', 'add', ORIGIN, `https://${token}@github.com/${process.env.GITHUB_REPOSITORY}`]);
+}
+
+async function extraHeaderConfigWithoutAuthorization() {
+  const serverUrl = new URL(process.env['GITHUB_SERVER_URL'] || 'https://github.com');
+  const configValues = [];
+
+  // check for both broad and specific extraheader values
+  for (const key of ['http.extraheader', `http.${serverUrl.origin}/.extraheader`]) {
+    // always set an empyt string to clear any stored config values for the key
+    configValues.push(`${key}=`);
+
+    const options = {
+      listeners: {
+        stdout: data => {
+          // if this isn't an authorization header, keep using it
+          const headers = data.toString().match(/[^\r\n]+/g);
+          headers.map(header => header.trim())
+                 .filter(header => !header.toLowerCase().startsWith('authorization:'))
+                 .forEach(header => configValues.push(`${key}=${header}`));
+
+        }
+      }
+    };
+    await exec.exec('git', ['config', '--get-all', key], options);
+  }
+
+  return configValues.flatMap(value => ['-c', value]);
 }
 
 async function getLicensedInput() {
@@ -167,6 +194,7 @@ async function deleteBranch(branch) {
 
 module.exports = {
   configureGit,
+  extraHeaderConfigWithoutAuthorization,
   getLicensedInput,
   getBranch,
   getCachePaths,
@@ -367,7 +395,9 @@ async function run() {
       // if files were changed, push them back up to origin using the passed in github token
       const commitMessage = core.getInput('commit_message', { required: true });
       await exec.exec('git', ['commit', '-m', commitMessage]);
-      await exec.exec('git', ['push', utils.getOrigin(), licensesBranch]);
+
+      const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
+      await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), licensesBranch]);
       licensesUpdated = true;
 
       const userPullRequest = await utils.findPullRequest(octokit, { head: userBranch, "-base": userBranch });
@@ -471,7 +501,9 @@ async function run() {
     // if files were changed, push them back up to origin using the passed in github token
     const commitMessage = core.getInput('commit_message', { required: true });
     await exec.exec('git', ['commit', '-m', commitMessage]);
-    await exec.exec('git', ['push', utils.getOrigin(), branch]);
+
+    const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
+    await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), branch]);
     licensesUpdated = true;
 
     // if a PR comment was supplied and PR exists, add comment

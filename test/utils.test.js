@@ -54,6 +54,68 @@ describe('configureGit', () => {
   });
 });
 
+describe('extraHeaderConfigWithoutAuthorization', () => {
+  beforeEach(() => {
+    sinon.stub(exec, 'exec').callsFake((command, args, options) => {
+      if (command.includes('http.extraheader')) {
+        options.listeners.stdout(Buffer.from('AUTHORIZATION: basic 123\r\nFOO: bar', 'utf-8'));
+      } else {
+        options.listeners.stdout(Buffer.from('AUTHORIZATION: basic 456\r\nFOO: bar', 'utf-8'));
+      }
+
+      return Promise.resolve(0);
+    });
+  });
+
+  afterEach(() => {
+    sinon.restore();
+    process.env = processEnv;
+  });
+
+  it('overwrites and filters authorization headers', async () => {
+    const expectedConfigValues = [];
+    expectedConfigValues.push('-c', 'http.extraheader=');
+    expectedConfigValues.push('-c', 'http.extraheader=FOO: bar');
+    expectedConfigValues.push('-c', 'http.https://github.com/.extraheader=');
+    expectedConfigValues.push('-c', 'http.https://github.com/.extraheader=FOO: bar');
+
+    const configValues = await utils.extraHeaderConfigWithoutAuthorization();
+    expect(configValues).toEqual(expectedConfigValues);
+
+    expect(exec.exec.callCount).toEqual(2);
+    expect(exec.exec.getCall(0).args).toEqual(expect.arrayContaining([
+      'git',
+      ['config', '--get-all', 'http.extraheader']
+    ]));
+    expect(exec.exec.getCall(1).args).toEqual(expect.arrayContaining([
+      'git',
+      ['config', '--get-all', 'http.https://github.com/.extraheader']
+    ]));
+  });
+
+  it('uses process.env[GITHUB_SERVER_URL] instead of the default GitHub url when set', async () => {
+    process.env['GITHUB_SERVER_URL'] = 'https://example.com';
+    const expectedConfigValues = [];
+    expectedConfigValues.push('-c', 'http.extraheader=');
+    expectedConfigValues.push('-c', 'http.extraheader=FOO: bar');
+    expectedConfigValues.push('-c', 'http.https://example.com/.extraheader=');
+    expectedConfigValues.push('-c', 'http.https://example.com/.extraheader=FOO: bar');
+
+    const configValues = await utils.extraHeaderConfigWithoutAuthorization();
+    expect(configValues).toEqual(expectedConfigValues);
+
+    expect(exec.exec.callCount).toEqual(2);
+    expect(exec.exec.getCall(0).args).toEqual(expect.arrayContaining([
+      'git',
+      ['config', '--get-all', 'http.extraheader']
+    ]));
+    expect(exec.exec.getCall(1).args).toEqual(expect.arrayContaining([
+      'git',
+      ['config', '--get-all', 'http.https://example.com/.extraheader']
+    ]));
+  });
+});
+
 describe('getLicensedInput', () => {
   const command = 'licensed';
   const configFile = path.normalize(path.join(__dirname, '..', '.licensed.yml'));
