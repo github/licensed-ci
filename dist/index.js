@@ -61,6 +61,7 @@ async function extraHeaderConfigWithoutAuthorization() {
     configValues.push(`${key}=`);
 
     const options = {
+      ignoreReturnCode: true,
       listeners: {
         stdout: data => {
           // if this isn't an authorization header, keep using it
