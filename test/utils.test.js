@@ -50,7 +50,69 @@ describe('configureGit', () => {
     expect(exec.exec.callCount).toEqual(3);
     expect(exec.exec.getCall(0).args).toEqual(['git', ['config', 'user.name', process.env.INPUT_USER_NAME]]);
     expect(exec.exec.getCall(1).args).toEqual(['git', ['config', 'user.email', process.env.INPUT_USER_EMAIL]]);
-    expect(exec.exec.getCall(2).args).toEqual(['git', ['remote', 'add', utils.getOrigin(), `https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`]]);
+    expect(exec.exec.getCall(2).args).toEqual(['git', ['remote', 'add', utils.getOrigin(), `https://${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}`]]);
+  });
+});
+
+describe('extraHeaderConfigWithoutAuthorization', () => {
+  beforeEach(() => {
+    sinon.stub(exec, 'exec').callsFake((command, args, options) => {
+      if (command.includes('http.extraheader')) {
+        options.listeners.stdout(Buffer.from('AUTHORIZATION: basic 123\r\nFOO: bar', 'utf-8'));
+      } else {
+        options.listeners.stdout(Buffer.from('AUTHORIZATION: basic 456\r\nFOO: bar', 'utf-8'));
+      }
+
+      return Promise.resolve(0);
+    });
+  });
+
+  afterEach(() => {
+    sinon.restore();
+    process.env = processEnv;
+  });
+
+  it('overwrites and filters authorization headers', async () => {
+    const expectedConfigValues = [];
+    expectedConfigValues.push('-c', 'http.extraheader=');
+    expectedConfigValues.push('-c', 'http.extraheader=FOO: bar');
+    expectedConfigValues.push('-c', 'http.https://github.com/.extraheader=');
+    expectedConfigValues.push('-c', 'http.https://github.com/.extraheader=FOO: bar');
+
+    const configValues = await utils.extraHeaderConfigWithoutAuthorization();
+    expect(configValues).toEqual(expectedConfigValues);
+
+    expect(exec.exec.callCount).toEqual(2);
+    expect(exec.exec.getCall(0).args).toEqual(expect.arrayContaining([
+      'git',
+      ['config', '--get-all', 'http.extraheader']
+    ]));
+    expect(exec.exec.getCall(1).args).toEqual(expect.arrayContaining([
+      'git',
+      ['config', '--get-all', 'http.https://github.com/.extraheader']
+    ]));
+  });
+
+  it('uses process.env[GITHUB_SERVER_URL] instead of the default GitHub url when set', async () => {
+    process.env['GITHUB_SERVER_URL'] = 'https://example.com';
+    const expectedConfigValues = [];
+    expectedConfigValues.push('-c', 'http.extraheader=');
+    expectedConfigValues.push('-c', 'http.extraheader=FOO: bar');
+    expectedConfigValues.push('-c', 'http.https://example.com/.extraheader=');
+    expectedConfigValues.push('-c', 'http.https://example.com/.extraheader=FOO: bar');
+
+    const configValues = await utils.extraHeaderConfigWithoutAuthorization();
+    expect(configValues).toEqual(expectedConfigValues);
+
+    expect(exec.exec.callCount).toEqual(2);
+    expect(exec.exec.getCall(0).args).toEqual(expect.arrayContaining([
+      'git',
+      ['config', '--get-all', 'http.extraheader']
+    ]));
+    expect(exec.exec.getCall(1).args).toEqual(expect.arrayContaining([
+      'git',
+      ['config', '--get-all', 'http.https://example.com/.extraheader']
+    ]));
   });
 });
 
@@ -232,10 +294,15 @@ describe('ensureBranch', () => {
     sinon.stub(exec, 'exec').resolves(0);
 
     await utils.ensureBranch(branch, branch);
-    expect(exec.exec.callCount).toEqual(1);
+    expect(exec.exec.callCount).toEqual(2);
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
-      ['checkout', branch],
+      ['fetch', utils.getOrigin(), branch],
+      { ignoreReturnCode: true }
+    ]);
+    expect(exec.exec.getCall(1).args).toEqual([
+      'git',
+      ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
       { ignoreReturnCode: true }
     ]);
   });
@@ -243,30 +310,47 @@ describe('ensureBranch', () => {
   describe('when branch !== parent', () => {
     it('creates a branch if it doesn\'t exist', async () => {
       sinon.stub(exec, 'exec')
-        .withArgs('git', ['checkout', branch]).resolves(1)
-        .withArgs('git', ['checkout', parent]).resolves(0)
-        .withArgs('git', ['checkout', '-b', branch]).resolves(0);
+        .withArgs('git', ['fetch', utils.getOrigin(), branch]).resolves(1)
+        .withArgs('git', ['fetch', utils.getOrigin(), parent]).resolves(0)
+        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${branch}`]).resolves(1)
+        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${parent}`]).resolves(0)
+        .withArgs('git', ['checkout', '--track', '-b', branch]).resolves(0);
 
       await utils.ensureBranch(branch, parent);
-      expect(exec.exec.callCount).toEqual(3);
+      expect(exec.exec.callCount).toEqual(5);
       expect(exec.exec.getCall(0).args).toEqual([
         'git',
-        ['checkout', branch],
+        ['fetch', utils.getOrigin(), branch],
         { ignoreReturnCode: true }
       ]);
-      expect(exec.exec.getCall(1).args).toEqual(['git', ['checkout', parent]]);
+      expect(exec.exec.getCall(1).args).toEqual([
+        'git',
+        ['fetch', utils.getOrigin(), parent],
+        { ignoreReturnCode: true }
+      ]);
       expect(exec.exec.getCall(2).args).toEqual([
         'git',
-        ['checkout', '-b', branch],
+        ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
+        { ignoreReturnCode: true }
+      ]);
+      expect(exec.exec.getCall(3).args).toEqual([
+        'git',
+        ['checkout', '--track', `${utils.getOrigin()}/${parent}`]
+      ]);
+      expect(exec.exec.getCall(4).args).toEqual([
+        'git',
+        ['checkout', '--track', '-b', branch],
         { ignoreReturnCode: true }
       ]);
     });
 
     it('raises an error if checkout and create fail', async () => {
       sinon.stub(exec, 'exec')
-        .withArgs('git', ['checkout', branch]).resolves(1)
-        .withArgs('git', ['checkout', parent]).resolves(0)
-        .withArgs('git', ['checkout', '-b', branch]).resolves(1);
+        .withArgs('git', ['fetch', utils.getOrigin(), branch]).resolves(1)
+        .withArgs('git', ['fetch', utils.getOrigin(), parent]).resolves(0)
+        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${branch}`]).resolves(1)
+        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${parent}`]).resolves(0)
+        .withArgs('git', ['checkout', '-b', '--track', branch]).resolves(1);
 
       await expect(utils.ensureBranch(branch, parent)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
@@ -281,10 +365,15 @@ describe('ensureBranch', () => {
       await expect(utils.ensureBranch(branch, branch)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
       );
-      expect(exec.exec.callCount).toEqual(1);
+      expect(exec.exec.callCount).toEqual(2);
       expect(exec.exec.getCall(0).args).toEqual([
         'git',
-        ['checkout', branch],
+        ['fetch', utils.getOrigin(), branch],
+        { ignoreReturnCode: true }
+      ]);
+      expect(exec.exec.getCall(1).args).toEqual([
+        'git',
+        ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
         { ignoreReturnCode: true }
       ]);
     });

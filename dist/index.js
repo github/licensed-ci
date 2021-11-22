@@ -48,7 +48,34 @@ async function configureGit() {
 
   await exec.exec('git', ['config', 'user.name', userName]);
   await exec.exec('git', ['config', 'user.email', userEmail]);
-  await exec.exec('git', ['remote', 'add', ORIGIN, `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}.git`]);
+  await exec.exec('git', ['remote', 'add', ORIGIN, `https://${token}@github.com/${process.env.GITHUB_REPOSITORY}`]);
+}
+
+async function extraHeaderConfigWithoutAuthorization() {
+  const serverUrl = new URL(process.env['GITHUB_SERVER_URL'] || 'https://github.com');
+  const configValues = [];
+
+  // check for both broad and specific extraheader values
+  for (const key of ['http.extraheader', `http.${serverUrl.origin}/.extraheader`]) {
+    // always set an empyt string to clear any stored config values for the key
+    configValues.push(`${key}=`);
+
+    const options = {
+      listeners: {
+        stdout: data => {
+          // if this isn't an authorization header, keep using it
+          const headers = data.toString().match(/[^\r\n]+/g);
+          headers.map(header => header.trim())
+                 .filter(header => !header.toLowerCase().startsWith('authorization:'))
+                 .forEach(header => configValues.push(`${key}=${header}`));
+
+        }
+      }
+    };
+    await exec.exec('git', ['config', '--get-all', key], options);
+  }
+
+  return configValues.flatMap(value => ['-c', value]);
 }
 
 async function getLicensedInput() {
@@ -117,11 +144,17 @@ async function filterCachePaths(paths) {
 }
 
 async function ensureBranch(branch, parent) {
+  // always fetch the work and licenses branches
+  await exec.exec('git', ['fetch', ORIGIN, branch], { ignoreReturnCode: true });
+  if (parent && branch != parent) {
+    await exec.exec('git', ['fetch', ORIGIN, parent], { ignoreReturnCode: true});
+  }
+
   // change to the target branch
-  let exitCode = await exec.exec('git', ['checkout', branch], { ignoreReturnCode: true });
-  if (exitCode != 0 && branch !== parent) {
-    await exec.exec('git', ['checkout', parent]);
-    exitCode = await exec.exec('git', ['checkout', '-b', branch], { ignoreReturnCode: true });
+  let exitCode = await exec.exec('git', ['checkout', '--track', `${ORIGIN}/${branch}`], { ignoreReturnCode: true });
+  if (exitCode != 0 && branch !== parent) {    
+    await exec.exec('git', ['checkout', '--track', `${ORIGIN}/${parent}`]);
+    exitCode = await exec.exec('git', ['checkout', '--track', '-b', `${branch}`], { ignoreReturnCode: true });
   }
 
   if (exitCode != 0) {
@@ -167,6 +200,7 @@ async function deleteBranch(branch) {
 
 module.exports = {
   configureGit,
+  extraHeaderConfigWithoutAuthorization,
   getLicensedInput,
   getBranch,
   getCachePaths,
@@ -218,11 +252,17 @@ async function createLicensesPullRequest(octokit, head, base, userPullRequest) {
     body
   });
 
-  await octokit.rest.pulls.requestReviewers({
-    ...github.context.repo,
-    pull_number: pull.number,
-    reviewers: [actor]
-  });
+  try {
+    // this will fail if the PR is created using a PAT 
+    // from `actor`s user account
+    await octokit.rest.pulls.requestReviewers({
+      ...github.context.repo,
+      pull_number: pull.number,
+      reviewers: [actor]
+    });
+  } catch (e) {
+    core.warning(e.message)
+  }  
 
   core.info(`Created pull request for changes: ${pull.html_url}`);
   return pull;
@@ -349,7 +389,7 @@ async function run() {
     await utils.ensureBranch(licensesBranch, userBranch);
 
     // ensure that branch is up to date with parent
-    let exitCode = await exec.exec('git', ['merge', '-s', 'recursive', '-Xtheirs', `origin/${userBranch}`], { ignoreReturnCode: true });
+    let exitCode = await exec.exec('git', ['merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${userBranch}`], { ignoreReturnCode: true });
     if (exitCode !== 0) {
       throw new Error(`Unable to get ${licensesBranch} up to date with ${userBranch}`);
     }
@@ -367,7 +407,9 @@ async function run() {
       // if files were changed, push them back up to origin using the passed in github token
       const commitMessage = core.getInput('commit_message', { required: true });
       await exec.exec('git', ['commit', '-m', commitMessage]);
-      await exec.exec('git', ['push', utils.getOrigin(), licensesBranch]);
+
+      const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
+      await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), licensesBranch]);
       licensesUpdated = true;
 
       const userPullRequest = await utils.findPullRequest(octokit, { head: userBranch, "-base": userBranch });
@@ -471,7 +513,9 @@ async function run() {
     // if files were changed, push them back up to origin using the passed in github token
     const commitMessage = core.getInput('commit_message', { required: true });
     await exec.exec('git', ['commit', '-m', commitMessage]);
-    await exec.exec('git', ['push', utils.getOrigin(), branch]);
+
+    const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
+    await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), branch]);
     licensesUpdated = true;
 
     // if a PR comment was supplied and PR exists, add comment

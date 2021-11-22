@@ -61,10 +61,11 @@ describe('branch workflow', () => {
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
     sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
+    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([])
     sinon.stub(github, 'getOctokit').returns(octokit);
     sinon.stub(exec, 'exec')
       .resolves(1)
-      .withArgs('git', ['merge', '-s', 'recursive', '-Xtheirs', `origin/${branch}`]).resolves(0)
+      .withArgs('git', ['merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`]).resolves(0)
       .withArgs(command, ['cache', '-c', configFilePath]).resolves()
       .withArgs('git', ['add', '--', ...cachePaths]).resolves()
       .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(0);
@@ -107,7 +108,7 @@ describe('branch workflow', () => {
     expect(exec.exec.callCount).toEqual(5);
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
-      ['merge', '-s', 'recursive', '-Xtheirs', `origin/${branch}`],
+      ['merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`],
       { ignoreReturnCode: true }
     ]);
     expect(exec.exec.getCall(1).args).toEqual([command, ['cache', '-c', configFilePath]]);
@@ -263,6 +264,23 @@ describe('branch workflow', () => {
       }]);
 
       // expect pr information set in output
+      expect(core.setOutput.calledWith('pr_url', licensesPullRequest.html_url)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_number', licensesPullRequest.number)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_created', 'true')).toEqual(true);
+    });
+
+    it('handles failures when requesting the actor as a PR reviewer', async () => {
+      utils.findPullRequest.withArgs(octokit, { head: licensesBranch, base: branch }).resolves(null);
+      createPullRequestEndpoint.resolves({ data: licensesPullRequest });
+      requestReviewersEndpoint.rejects(new Error('request reviewer failed'))
+
+      await expect(workflow()).rejects.toThrow();
+
+      // expect pr information set in output
+      expect(core.warning.callCount).toEqual(1)
+      expect(core.warning.calledWith('request reviewer failed')).toEqual(true);
+
+      // validate that action completed by checking PR information in output
       expect(core.setOutput.calledWith('pr_url', licensesPullRequest.html_url)).toEqual(true);
       expect(core.setOutput.calledWith('pr_number', licensesPullRequest.number)).toEqual(true);
       expect(core.setOutput.calledWith('pr_created', 'true')).toEqual(true);
