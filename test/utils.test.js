@@ -294,10 +294,15 @@ describe('ensureBranch', () => {
     sinon.stub(exec, 'exec').resolves(0);
 
     await utils.ensureBranch(branch, branch);
-    expect(exec.exec.callCount).toEqual(1);
+    expect(exec.exec.callCount).toEqual(2);
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
-      ['checkout', branch],
+      ['fetch', utils.getOrigin(), branch],
+      { ignoreReturnCode: true }
+    ]);
+    expect(exec.exec.getCall(1).args).toEqual([
+      'git',
+      ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
       { ignoreReturnCode: true }
     ]);
   });
@@ -305,30 +310,47 @@ describe('ensureBranch', () => {
   describe('when branch !== parent', () => {
     it('creates a branch if it doesn\'t exist', async () => {
       sinon.stub(exec, 'exec')
-        .withArgs('git', ['checkout', branch]).resolves(1)
-        .withArgs('git', ['checkout', parent]).resolves(0)
-        .withArgs('git', ['checkout', '-b', branch]).resolves(0);
+        .withArgs('git', ['fetch', utils.getOrigin(), branch]).resolves(1)
+        .withArgs('git', ['fetch', utils.getOrigin(), parent]).resolves(0)
+        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${branch}`]).resolves(1)
+        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${parent}`]).resolves(0)
+        .withArgs('git', ['checkout', '--track', '-b', branch]).resolves(0);
 
       await utils.ensureBranch(branch, parent);
-      expect(exec.exec.callCount).toEqual(3);
+      expect(exec.exec.callCount).toEqual(5);
       expect(exec.exec.getCall(0).args).toEqual([
         'git',
-        ['checkout', branch],
+        ['fetch', utils.getOrigin(), branch],
         { ignoreReturnCode: true }
       ]);
-      expect(exec.exec.getCall(1).args).toEqual(['git', ['checkout', parent]]);
+      expect(exec.exec.getCall(1).args).toEqual([
+        'git',
+        ['fetch', utils.getOrigin(), parent],
+        { ignoreReturnCode: true }
+      ]);
       expect(exec.exec.getCall(2).args).toEqual([
         'git',
-        ['checkout', '-b', branch],
+        ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
+        { ignoreReturnCode: true }
+      ]);
+      expect(exec.exec.getCall(3).args).toEqual([
+        'git',
+        ['checkout', '--track', `${utils.getOrigin()}/${parent}`]
+      ]);
+      expect(exec.exec.getCall(4).args).toEqual([
+        'git',
+        ['checkout', '--track', '-b', branch],
         { ignoreReturnCode: true }
       ]);
     });
 
     it('raises an error if checkout and create fail', async () => {
       sinon.stub(exec, 'exec')
-        .withArgs('git', ['checkout', branch]).resolves(1)
-        .withArgs('git', ['checkout', parent]).resolves(0)
-        .withArgs('git', ['checkout', '-b', branch]).resolves(1);
+        .withArgs('git', ['fetch', utils.getOrigin(), branch]).resolves(1)
+        .withArgs('git', ['fetch', utils.getOrigin(), parent]).resolves(0)
+        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${branch}`]).resolves(1)
+        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${parent}`]).resolves(0)
+        .withArgs('git', ['checkout', '-b', '--track', branch]).resolves(1);
 
       await expect(utils.ensureBranch(branch, parent)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
@@ -343,10 +365,15 @@ describe('ensureBranch', () => {
       await expect(utils.ensureBranch(branch, branch)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
       );
-      expect(exec.exec.callCount).toEqual(1);
+      expect(exec.exec.callCount).toEqual(2);
       expect(exec.exec.getCall(0).args).toEqual([
         'git',
-        ['checkout', branch],
+        ['fetch', utils.getOrigin(), branch],
+        { ignoreReturnCode: true }
+      ]);
+      expect(exec.exec.getCall(1).args).toEqual([
+        'git',
+        ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
         { ignoreReturnCode: true }
       ]);
     });

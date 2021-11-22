@@ -65,7 +65,7 @@ describe('branch workflow', () => {
     sinon.stub(github, 'getOctokit').returns(octokit);
     sinon.stub(exec, 'exec')
       .resolves(1)
-      .withArgs('git', ['merge', '-s', 'recursive', '-Xtheirs', `origin/${branch}`]).resolves(0)
+      .withArgs('git', ['merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`]).resolves(0)
       .withArgs(command, ['cache', '-c', configFilePath]).resolves()
       .withArgs('git', ['add', '--', ...cachePaths]).resolves()
       .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(0);
@@ -108,7 +108,7 @@ describe('branch workflow', () => {
     expect(exec.exec.callCount).toEqual(5);
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
-      ['merge', '-s', 'recursive', '-Xtheirs', `origin/${branch}`],
+      ['merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`],
       { ignoreReturnCode: true }
     ]);
     expect(exec.exec.getCall(1).args).toEqual([command, ['cache', '-c', configFilePath]]);

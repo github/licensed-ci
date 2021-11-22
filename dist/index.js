@@ -144,11 +144,17 @@ async function filterCachePaths(paths) {
 }
 
 async function ensureBranch(branch, parent) {
+  // always fetch the work and licenses branches
+  await exec.exec('git', ['fetch', ORIGIN, branch], { ignoreReturnCode: true });
+  if (parent && branch != parent) {
+    await exec.exec('git', ['fetch', ORIGIN, parent], { ignoreReturnCode: true});
+  }
+
   // change to the target branch
-  let exitCode = await exec.exec('git', ['checkout', branch], { ignoreReturnCode: true });
-  if (exitCode != 0 && branch !== parent) {
-    await exec.exec('git', ['checkout', parent]);
-    exitCode = await exec.exec('git', ['checkout', '-b', branch], { ignoreReturnCode: true });
+  let exitCode = await exec.exec('git', ['checkout', '--track', `${ORIGIN}/${branch}`], { ignoreReturnCode: true });
+  if (exitCode != 0 && branch !== parent) {    
+    await exec.exec('git', ['checkout', '--track', `${ORIGIN}/${parent}`]);
+    exitCode = await exec.exec('git', ['checkout', '--track', '-b', `${branch}`], { ignoreReturnCode: true });
   }
 
   if (exitCode != 0) {
@@ -246,11 +252,17 @@ async function createLicensesPullRequest(octokit, head, base, userPullRequest) {
     body
   });
 
-  await octokit.rest.pulls.requestReviewers({
-    ...github.context.repo,
-    pull_number: pull.number,
-    reviewers: [actor]
-  });
+  try {
+    // this will fail if the PR is created using a PAT 
+    // from `actor`s user account
+    await octokit.rest.pulls.requestReviewers({
+      ...github.context.repo,
+      pull_number: pull.number,
+      reviewers: [actor]
+    });
+  } catch (e) {
+    core.warning(e.message)
+  }  
 
   core.info(`Created pull request for changes: ${pull.html_url}`);
   return pull;
@@ -377,7 +389,7 @@ async function run() {
     await utils.ensureBranch(licensesBranch, userBranch);
 
     // ensure that branch is up to date with parent
-    let exitCode = await exec.exec('git', ['merge', '-s', 'recursive', '-Xtheirs', `origin/${userBranch}`], { ignoreReturnCode: true });
+    let exitCode = await exec.exec('git', ['merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${userBranch}`], { ignoreReturnCode: true });
     if (exitCode !== 0) {
       throw new Error(`Unable to get ${licensesBranch} up to date with ${userBranch}`);
     }
