@@ -269,6 +269,23 @@ describe('branch workflow', () => {
       expect(core.setOutput.calledWith('pr_created', 'true')).toEqual(true);
     });
 
+    it('handles failures when requesting the actor as a PR reviewer', async () => {
+      utils.findPullRequest.withArgs(octokit, { head: licensesBranch, base: branch }).resolves(null);
+      createPullRequestEndpoint.resolves({ data: licensesPullRequest });
+      requestReviewersEndpoint.rejects(new Error('request reviewer failed'))
+
+      await expect(workflow()).rejects.toThrow();
+
+      // expect pr information set in output
+      expect(core.warning.callCount).toEqual(1)
+      expect(core.warning.calledWith('request reviewer failed')).toEqual(true);
+
+      // validate that action completed by checking PR information in output
+      expect(core.setOutput.calledWith('pr_url', licensesPullRequest.html_url)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_number', licensesPullRequest.number)).toEqual(true);
+      expect(core.setOutput.calledWith('pr_created', 'true')).toEqual(true);
+    });
+
     it('does not open a PR for changes if it exists', async () => {
       await expect(workflow()).rejects.toThrow();
       expect(createPullRequestEndpoint.callCount).toEqual(0);
