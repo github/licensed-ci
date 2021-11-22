@@ -1,11 +1,5 @@
 name: "Run licensed in test"
-on:
-  push:
-    branches:
-      - 'master'
-    tags-ignore:
-      - '**'
-  pull_request:
+on: pull_request
 
 jobs:
   licensed_ci:
@@ -15,8 +9,7 @@ jobs:
         node: [ 12.x, 14.x, 16.x ]
     steps:
     - uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
+
     - uses: actions/setup-node@v2
       with:
         cache: npm
