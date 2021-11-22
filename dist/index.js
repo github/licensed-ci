@@ -48,7 +48,7 @@ async function configureGit() {
 
   await exec.exec('git', ['config', 'user.name', userName]);
   await exec.exec('git', ['config', 'user.email', userEmail]);
-  await exec.exec('git', ['remote', 'add', ORIGIN, `https://${token}@github.com/${process.env.GITHUB_REPOSITORY}`]);
+  await exec.exec('git', ['remote', 'add', ORIGIN, `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}`]);
 }
 
 async function extraHeaderConfigWithoutAuthorization() {
