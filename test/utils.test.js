@@ -50,7 +50,7 @@ describe('configureGit', () => {
     expect(exec.exec.callCount).toEqual(3);
     expect(exec.exec.getCall(0).args).toEqual(['git', ['config', 'user.name', process.env.INPUT_USER_NAME]]);
     expect(exec.exec.getCall(1).args).toEqual(['git', ['config', 'user.email', process.env.INPUT_USER_EMAIL]]);
-    expect(exec.exec.getCall(2).args).toEqual(['git', ['remote', 'add', utils.getOrigin(), `https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}.git`]]);
+    expect(exec.exec.getCall(2).args).toEqual(['git', ['remote', 'add', utils.getOrigin(), `https://${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}`]]);
   });
 });
 
