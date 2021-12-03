@@ -73,26 +73,34 @@ on:
   # run on demand
   workflow_dispatch:
 
-steps:
-- uses: actions/checkout@v2
-- uses: jonabc/setup-licensed@v1
-  with:
-    version: 3.x
-- run: npm install # install your projects dependencies in local environment
-- id: licensed
-  uses: jonabc/licensed-ci@v1
-  with:
-    github_token: ${{ secrets.GITHUB_TOKEN }}
-- uses: actions/github-script@0.2.0
-  if: always() && steps.licensed.outputs.pr_number
-  with:
-    github-token: ${{ secrets.GITHUB_TOKEN }}
-    script: |
-      github.issues.createComment({
-        ...context.repo,
-        issue_number: ${{ steps.licensed.outputs.pr_number }}
-        body: 'My custom PR message'
-      })
+# ensure that the action can push changes to the repo and edit PRs
+# when using `secrets.GITHUB_TOKEN`
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  licensed:
+    steps:
+    - uses: actions/checkout@v2
+    - uses: jonabc/setup-licensed@v1
+      with:
+        version: 3.x
+    - run: npm install # install your projects dependencies in local environment
+    - id: licensed
+      uses: jonabc/licensed-ci@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/github-script@0.2.0
+      if: always() && steps.licensed.outputs.pr_number
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          github.issues.createComment({
+            ...context.repo,
+            issue_number: ${{ steps.licensed.outputs.pr_number }}
+            body: 'My custom PR message'
+          })
 ```
 
 Basic usage installing licensed gem using bundler + Gemfile
@@ -112,21 +120,35 @@ on:
   # run on demand
   workflow_dispatch:
 
-steps:
-- uses: actions/checkout@v2
-- uses: actions/setup-ruby@v1
-  with:
-    ruby-version: 2.6.x
-- run: bundle install
-- uses: jonabc/licensed-ci@v1
-  with:
-    github_token: ${{ secrets.GITHUB_TOKEN }}
-    command: 'bundle exec licensed' # or bin/licensed when using binstubs
+# ensure that the action can push changes to the repo and edit PRs
+# when using `secrets.GITHUB_TOKEN`
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  licensed:
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-ruby@v1
+      with:
+        ruby-version: 2.6.x
+    - run: bundle install
+    - uses: jonabc/licensed-ci@v1
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        command: 'bundle exec licensed' # or bin/licensed when using binstubs
 ```
 
 ### Supported Events
 
 This action supports the `push` and `pull_request` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
+
+### Using licensed-ci with permission restrictions on GITHUB_TOKEN
+
+If your action workflow [restricts which permissions](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token) are granted to `GITHUB_TOKEN`, please ensure that both `contents` and `pull-requests` are set to `write`. As part of an Actions workflow, `licensed-ci` can push license metadata file updates to a repo, comment on existing PRs, and open new PRs.
+
+Dependabot 
 
 ## License
 
