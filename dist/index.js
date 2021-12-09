@@ -42,12 +42,7 @@ const stream = __nccwpck_require__(2781);
 const ORIGIN = 'licensed-ci-origin';
 
 async function configureGit() {
-  const userName = core.getInput('user_name', { required: true });
-  const userEmail = core.getInput('user_email', { required: true });
   const token = core.getInput('github_token', { required: true });
-
-  await exec.exec('git', ['config', 'user.name', userName]);
-  await exec.exec('git', ['config', 'user.email', userEmail]);
   await exec.exec('git', ['remote', 'add', ORIGIN, `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}`]);
 }
 
@@ -77,6 +72,16 @@ async function extraHeaderConfigWithoutAuthorization() {
   }
 
   return configValues.flatMap(value => ['-c', value]);
+}
+
+function userConfig() {
+  const userName = core.getInput('user_name', { required: true });
+  const userEmail = core.getInput('user_email', { required: true });
+
+  return [
+    '-c', `user.name=${userName}`,
+    '-c', `user.email=${userEmail}`
+  ]
 }
 
 async function getLicensedInput() {
@@ -211,6 +216,7 @@ async function deleteBranch(branch) {
 module.exports = {
   configureGit,
   extraHeaderConfigWithoutAuthorization,
+  userConfig,
   getLicensedInput,
   getBranch,
   getCachePaths,
@@ -399,7 +405,7 @@ async function run() {
     const [localLicensesBranch, localUserBranch] = await utils.ensureBranch(licensesBranch, userBranch);
 
     // ensure that branch is up to date with parent
-    let exitCode = await exec.exec('git', ['merge', '-s', 'recursive', '-Xtheirs', localUserBranch], { ignoreReturnCode: true });
+    let exitCode = await exec.exec('git', [...utils.userConfig(), 'merge', '-s', 'recursive', '-Xtheirs', localUserBranch], { ignoreReturnCode: true });
     if (exitCode !== 0) {
       throw new Error(`Unable to get ${licensesBranch} up to date with ${userBranch}`);
     }
@@ -416,7 +422,7 @@ async function run() {
     if (exitCode > 0) {
       // if files were changed, push them back up to origin using the passed in github token
       const commitMessage = core.getInput('commit_message', { required: true });
-      await exec.exec('git', ['commit', '-m', commitMessage]);
+      await exec.exec('git', [...utils.userConfig(), 'commit', '-m', commitMessage]);
 
       const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
       await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`]);
@@ -522,7 +528,8 @@ async function run() {
   if (exitCode > 0) {
     // if files were changed, push them back up to origin using the passed in github token
     const commitMessage = core.getInput('commit_message', { required: true });
-    await exec.exec('git', ['commit', '-m', commitMessage]);
+    const userConfig = utils.userConfig();
+    await exec.exec('git', [...userConfig, 'commit', '-m', commitMessage]);
 
     const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
     await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), `${localBranch}:${branch}`]);

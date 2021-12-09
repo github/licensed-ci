@@ -21,6 +21,7 @@ describe('push workflow', () => {
   // to match the response from the testSearchResult.json fixture
   const owner = 'jonabc';
   const repo = 'setup-licensed';
+  const userConfig = ['-c', 'config=value'];
 
   let octokit;
   let createCommentEndpoint;
@@ -45,6 +46,7 @@ describe('push workflow', () => {
     sinon.stub(core, 'warning');
     sinon.stub(core, 'setOutput');
 
+    sinon.stub(utils, 'userConfig').returns(userConfig);
     sinon.stub(utils, 'getBranch').returns('branch');
     sinon.stub(utils, 'getLicensedInput').resolves({ command, configFilePath });
     sinon.stub(utils, 'ensureBranch').resolves([localBranch, localBranch]);
@@ -171,7 +173,7 @@ describe('push workflow', () => {
 
     it('pushes changes to origin', async () => {
       await workflow();
-      expect(exec.exec.calledWith('git', ['commit', '-m', commitMessage])).toEqual(true);
+      expect(exec.exec.calledWith('git', [...userConfig, 'commit', '-m', commitMessage])).toEqual(true);
       expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), `${localBranch}:${branch}`])).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'true')).toEqual(true);
     });
