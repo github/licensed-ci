@@ -298,6 +298,10 @@ describe('ensureBranch', () => {
   let branch = 'branch';
   let parent = 'parent';
 
+  beforeEach(() => {
+    sinon.stub(fs, 'existsSync').withArgs('.git/shallow').returns(false);
+  });
+
   afterEach(() => {
     sinon.restore();
   });
@@ -314,7 +318,20 @@ describe('ensureBranch', () => {
     ]);
     expect(exec.exec.getCall(1).args).toEqual([
       'git',
-      ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
+      ['checkout', '--force', '-B', `${utils.getOrigin()}/${branch}`, `refs/remotes/${utils.getOrigin()}/${branch}`],
+      { ignoreReturnCode: true }
+    ]);
+  });
+
+  it('checks out a branch with unshallow if .git/shallow file exists', async () => {
+    fs.existsSync.withArgs('.git/shallow').returns(true);
+    sinon.stub(exec, 'exec').resolves(0);
+
+    await utils.ensureBranch(branch, branch);
+    expect(exec.exec.callCount).toEqual(2);
+    expect(exec.exec.getCall(0).args).toEqual([
+      'git',
+      ['fetch', '--unshallow', utils.getOrigin(), branch],
       { ignoreReturnCode: true }
     ]);
   });
@@ -324,12 +341,11 @@ describe('ensureBranch', () => {
       sinon.stub(exec, 'exec')
         .withArgs('git', ['fetch', utils.getOrigin(), branch]).resolves(1)
         .withArgs('git', ['fetch', utils.getOrigin(), parent]).resolves(0)
-        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${branch}`]).resolves(1)
-        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${parent}`]).resolves(0)
-        .withArgs('git', ['checkout', '--track', '-b', branch]).resolves(0);
+        .withArgs('git', ['checkout', '--force', '-B', `${utils.getOrigin()}/${branch}`, `refs/remotes/${utils.getOrigin()}/${branch}`]).resolves(1)
+        .withArgs('git', ['checkout', '--force', '-B', `${utils.getOrigin()}/${branch}`, `refs/remotes/${utils.getOrigin()}/${parent}`]).resolves(0);
 
       await utils.ensureBranch(branch, parent);
-      expect(exec.exec.callCount).toEqual(5);
+      expect(exec.exec.callCount).toEqual(4);
       expect(exec.exec.getCall(0).args).toEqual([
         'git',
         ['fetch', utils.getOrigin(), branch],
@@ -342,16 +358,12 @@ describe('ensureBranch', () => {
       ]);
       expect(exec.exec.getCall(2).args).toEqual([
         'git',
-        ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
+        ['checkout', '--force', '-B', `${utils.getOrigin()}/${branch}`, `refs/remotes/${utils.getOrigin()}/${branch}`],
         { ignoreReturnCode: true }
       ]);
       expect(exec.exec.getCall(3).args).toEqual([
         'git',
-        ['checkout', '--track', `${utils.getOrigin()}/${parent}`]
-      ]);
-      expect(exec.exec.getCall(4).args).toEqual([
-        'git',
-        ['checkout', '--track', '-b', branch],
+        ['checkout', '--force', '-B', `${utils.getOrigin()}/${branch}`, `refs/remotes/${utils.getOrigin()}/${parent}`],
         { ignoreReturnCode: true }
       ]);
     });
@@ -360,9 +372,8 @@ describe('ensureBranch', () => {
       sinon.stub(exec, 'exec')
         .withArgs('git', ['fetch', utils.getOrigin(), branch]).resolves(1)
         .withArgs('git', ['fetch', utils.getOrigin(), parent]).resolves(0)
-        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${branch}`]).resolves(1)
-        .withArgs('git', ['checkout', '--track', `${utils.getOrigin()}/${parent}`]).resolves(0)
-        .withArgs('git', ['checkout', '-b', '--track', branch]).resolves(1);
+        .withArgs('git', ['checkout', '--force', '-B', `${utils.getOrigin()}/${branch}`, `refs/remotes/${utils.getOrigin()}/${branch}`]).resolves(1)
+        .withArgs('git', ['checkout', '--force', '-B', `${utils.getOrigin()}/${branch}`, `refs/remotes/${utils.getOrigin()}/${parent}`]).resolves(1);
 
       await expect(utils.ensureBranch(branch, parent)).rejects.toThrow(
         `Unable to find or create the ${branch} branch`
@@ -385,7 +396,7 @@ describe('ensureBranch', () => {
       ]);
       expect(exec.exec.getCall(1).args).toEqual([
         'git',
-        ['checkout', '--track', `${utils.getOrigin()}/${branch}`],
+        ['checkout', '--force', '-B', `${utils.getOrigin()}/${branch}`, `refs/remotes/${utils.getOrigin()}/${branch}`],
         { ignoreReturnCode: true }
       ]);
     });

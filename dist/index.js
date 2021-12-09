@@ -150,22 +150,31 @@ async function filterCachePaths(paths) {
 }
 
 async function ensureBranch(branch, parent) {
+  const localBranch = `${ORIGIN}/${branch}`;
+  const localParent = `${ORIGIN}/${parent}`;
+
   // always fetch the work and licenses branches
-  await exec.exec('git', ['fetch', ORIGIN, branch], { ignoreReturnCode: true });
+  const fetchOpts = [];
+  if (fs.existsSync('.git/shallow')) {
+    fetchOpts.push('--unshallow');
+  }
+
+  let exitCode = await exec.exec('git', ['fetch', ...fetchOpts, ORIGIN, branch], { ignoreReturnCode: true });
   if (parent && branch != parent) {
     await exec.exec('git', ['fetch', ORIGIN, parent], { ignoreReturnCode: true});
   }
 
   // change to the target branch
-  let exitCode = await exec.exec('git', ['checkout', '--track', `${ORIGIN}/${branch}`], { ignoreReturnCode: true });
+  exitCode = await exec.exec('git', ['checkout', '--force', '-B', localBranch, `refs/remotes/${ORIGIN}/${branch}`], { ignoreReturnCode: true });
   if (exitCode != 0 && branch !== parent) {    
-    await exec.exec('git', ['checkout', '--track', `${ORIGIN}/${parent}`]);
-    exitCode = await exec.exec('git', ['checkout', '--track', '-b', `${branch}`], { ignoreReturnCode: true });
+    exitCode = await exec.exec('git', ['checkout', '--force', '-B', localBranch, `refs/remotes/${ORIGIN}/${parent}`], { ignoreReturnCode: true });
   }
 
   if (exitCode != 0) {
     throw new Error(`Unable to find or create the ${branch} branch`);
   }
+
+  return [localBranch, localParent];
 }
 
 async function findPullRequest(octokit, options={}) {
@@ -393,10 +402,10 @@ async function run() {
   // recache data only when on a non-licenses branch
   if (branch !== licensesBranch) {
     // change to a `<branch>-licenses` branch to continue updates
-    await utils.ensureBranch(licensesBranch, userBranch);
+    const [localLicensesBranch, localUserBranch] = await utils.ensureBranch(licensesBranch, userBranch);
 
     // ensure that branch is up to date with parent
-    let exitCode = await exec.exec('git', [...utils.userConfig(), 'merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${userBranch}`], { ignoreReturnCode: true });
+    let exitCode = await exec.exec('git', [...utils.userConfig(), 'merge', '-s', 'recursive', '-Xtheirs', localUserBranch], { ignoreReturnCode: true });
     if (exitCode !== 0) {
       throw new Error(`Unable to get ${licensesBranch} up to date with ${userBranch}`);
     }
@@ -416,7 +425,7 @@ async function run() {
       await exec.exec('git', [...utils.userConfig(), 'commit', '-m', commitMessage]);
 
       const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
-      await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), licensesBranch]);
+      await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`]);
       licensesUpdated = true;
 
       const userPullRequest = await utils.findPullRequest(octokit, { head: userBranch, "-base": userBranch });
@@ -500,7 +509,7 @@ async function run() {
     return;
   }
 
-  await utils.ensureBranch(branch, branch);
+  const [localBranch] = await utils.ensureBranch(branch, branch);
 
   // find an open pull request for the changes if one exists
   const token = core.getInput('github_token', { required: true });
@@ -523,7 +532,7 @@ async function run() {
     await exec.exec('git', [...userConfig, 'commit', '-m', commitMessage]);
 
     const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
-    await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), branch]);
+    await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), `${localBranch}:${branch}`]);
     licensesUpdated = true;
 
     // if a PR comment was supplied and PR exists, add comment

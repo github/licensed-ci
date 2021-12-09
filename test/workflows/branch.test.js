@@ -17,6 +17,8 @@ describe('branch workflow', () => {
 
   const branch = 'branch';
   const licensesBranch = 'branch-licenses';
+  const localBranch = `${utils.getOrigin()}/${branch}`;
+  const localLicensesBranch = `${utils.getOrigin()}/${licensesBranch}`;
 
   const pullRequest = require(path.normalize(path.join(__dirname, '..', 'fixtures', 'pullRequest.json')));
 
@@ -59,7 +61,7 @@ describe('branch workflow', () => {
     sinon.stub(utils, 'userConfig').returns(userConfig)
     sinon.stub(utils, 'getBranch').returns(branch);
     sinon.stub(utils, 'getLicensedInput').resolves({ command, configFilePath });
-    sinon.stub(utils, 'ensureBranch').resolves();
+    sinon.stub(utils, 'ensureBranch').resolves([localLicensesBranch, localBranch]);
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
     sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
@@ -67,7 +69,7 @@ describe('branch workflow', () => {
     sinon.stub(github, 'getOctokit').returns(octokit);
     sinon.stub(exec, 'exec')
       .resolves(1)
-      .withArgs('git', [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`]).resolves(0)
+      .withArgs('git', [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', localBranch]).resolves(0)
       .withArgs(command, ['cache', '-c', configFilePath]).resolves()
       .withArgs('git', ['add', '--', ...cachePaths]).resolves()
       .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(0);
@@ -110,7 +112,7 @@ describe('branch workflow', () => {
     expect(exec.exec.callCount).toEqual(5);
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
-      [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`],
+      [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', localBranch],
       { ignoreReturnCode: true }
     ]);
     expect(exec.exec.getCall(1).args).toEqual([command, ['cache', '-c', configFilePath]]);
@@ -210,7 +212,7 @@ describe('branch workflow', () => {
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
-      expect(exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), branch])).toEqual(true);
+      expect(exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`])).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
     });
   });
@@ -227,7 +229,7 @@ describe('branch workflow', () => {
       exec.exec
         .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(1)
         .withArgs('git', [...userConfig, 'commit', '-m', commitMessage]).resolves()
-        .withArgs('git', ['push', utils.getOrigin(), licensesBranch]).resolves();
+        .withArgs('git', ['push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`]).resolves();
 
       utils.findPullRequest
         .withArgs(octokit, { head: licensesBranch, base: branch }).resolves(licensesPullRequest)
@@ -237,7 +239,7 @@ describe('branch workflow', () => {
     it('pushes changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
       expect(exec.exec.calledWith('git', [...userConfig, 'commit', '-m', commitMessage])).toEqual(true);
-      expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), licensesBranch])).toEqual(true);
+      expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`])).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'true')).toEqual(true);
     });
 
