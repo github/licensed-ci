@@ -22,6 +22,7 @@ describe('branch workflow', () => {
 
   const owner = 'jonabc';
   const repo = 'licensed-ci';
+  const userConfig = ['-c', 'config=value'];
 
   let octokit;
   let createCommentEndpoint;
@@ -55,6 +56,7 @@ describe('branch workflow', () => {
     sinon.stub(core, 'warning');
     sinon.stub(core, 'setOutput');
 
+    sinon.stub(utils, 'userConfig').returns(userConfig)
     sinon.stub(utils, 'getBranch').returns(branch);
     sinon.stub(utils, 'getLicensedInput').resolves({ command, configFilePath });
     sinon.stub(utils, 'ensureBranch').resolves();
@@ -65,7 +67,7 @@ describe('branch workflow', () => {
     sinon.stub(github, 'getOctokit').returns(octokit);
     sinon.stub(exec, 'exec')
       .resolves(1)
-      .withArgs('git', ['merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`]).resolves(0)
+      .withArgs('git', [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`]).resolves(0)
       .withArgs(command, ['cache', '-c', configFilePath]).resolves()
       .withArgs('git', ['add', '--', ...cachePaths]).resolves()
       .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(0);
@@ -108,7 +110,7 @@ describe('branch workflow', () => {
     expect(exec.exec.callCount).toEqual(5);
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
-      ['merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`],
+      [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', `${utils.getOrigin()}/${branch}`],
       { ignoreReturnCode: true }
     ]);
     expect(exec.exec.getCall(1).args).toEqual([command, ['cache', '-c', configFilePath]]);
@@ -224,7 +226,7 @@ describe('branch workflow', () => {
     beforeEach(() => {
       exec.exec
         .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(1)
-        .withArgs('git', ['commit', '-m', commitMessage]).resolves()
+        .withArgs('git', [...userConfig, 'commit', '-m', commitMessage]).resolves()
         .withArgs('git', ['push', utils.getOrigin(), licensesBranch]).resolves();
 
       utils.findPullRequest
@@ -234,7 +236,7 @@ describe('branch workflow', () => {
 
     it('pushes changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
-      expect(exec.exec.calledWith('git', ['commit', '-m', commitMessage])).toEqual(true);
+      expect(exec.exec.calledWith('git', [...userConfig, 'commit', '-m', commitMessage])).toEqual(true);
       expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), licensesBranch])).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'true')).toEqual(true);
     });
