@@ -16,6 +16,7 @@ describe('push workflow', () => {
   const cachePaths = ['cache1', 'cache2'];
 
   const branch = 'branch';
+  const localBranch = `${utils.getOrigin()}/${branch}`;
 
   // to match the response from the testSearchResult.json fixture
   const owner = 'jonabc';
@@ -46,7 +47,7 @@ describe('push workflow', () => {
 
     sinon.stub(utils, 'getBranch').returns('branch');
     sinon.stub(utils, 'getLicensedInput').resolves({ command, configFilePath });
-    sinon.stub(utils, 'ensureBranch').resolves();
+    sinon.stub(utils, 'ensureBranch').resolves([localBranch, localBranch]);
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
     sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
@@ -142,7 +143,7 @@ describe('push workflow', () => {
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await workflow();
-      expect(exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), branch])).toEqual(true);
+      expect(exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), `${localBranch}:${branch}`])).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
     });
   });
@@ -171,7 +172,7 @@ describe('push workflow', () => {
     it('pushes changes to origin', async () => {
       await workflow();
       expect(exec.exec.calledWith('git', ['commit', '-m', commitMessage])).toEqual(true);
-      expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), branch])).toEqual(true);
+      expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), `${localBranch}:${branch}`])).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'true')).toEqual(true);
     });
 
