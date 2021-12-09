@@ -8,8 +8,6 @@ const processEnv = process.env;
 
 describe('configureGit', () => {
   beforeEach(() => {
-    process.env.INPUT_USER_NAME = 'user';
-    process.env.INPUT_USER_EMAIL = 'email';
     process.env.INPUT_GITHUB_TOKEN = 'token';
     process.env.GITHUB_REPOSITORY = 'jonabc/licensed-ci';
   })
@@ -17,22 +15,6 @@ describe('configureGit', () => {
   afterEach(() => {
     sinon.restore();
     process.env = processEnv;
-  });
-
-  it('raises an error when user_name is not given', async () => {
-    delete process.env.INPUT_USER_NAME;
-
-    await expect(utils.configureGit()).rejects.toThrow(
-      'Input required and not supplied: user_name'
-    );
-  });
-
-  it('raises an error when user_email is not given', async () => {
-    delete process.env.INPUT_USER_EMAIL;
-
-    await expect(utils.configureGit()).rejects.toThrow(
-      'Input required and not supplied: user_email'
-    );
   });
 
   it('raises an error when github_token is not given', async () => {
@@ -47,10 +29,8 @@ describe('configureGit', () => {
     sinon.stub(exec, 'exec').resolves();
 
     await utils.configureGit();
-    expect(exec.exec.callCount).toEqual(3);
-    expect(exec.exec.getCall(0).args).toEqual(['git', ['config', 'user.name', process.env.INPUT_USER_NAME]]);
-    expect(exec.exec.getCall(1).args).toEqual(['git', ['config', 'user.email', process.env.INPUT_USER_EMAIL]]);
-    expect(exec.exec.getCall(2).args).toEqual(['git', ['remote', 'add', utils.getOrigin(), `https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}`]]);
+    expect(exec.exec.callCount).toEqual(1);
+    expect(exec.exec.getCall(0).args).toEqual(['git', ['remote', 'add', utils.getOrigin(), `https://x-access-token:${process.env.INPUT_GITHUB_TOKEN}@github.com/${process.env.GITHUB_REPOSITORY}`]]);
   });
 });
 
@@ -115,6 +95,38 @@ describe('extraHeaderConfigWithoutAuthorization', () => {
     ]));
   });
 });
+
+describe('userConfig', () => {
+  beforeEach(() => {
+    process.env.INPUT_USER_NAME = 'user';
+    process.env.INPUT_USER_EMAIL = 'email';
+  })
+
+  afterEach(() => {
+    sinon.restore();
+    process.env = processEnv;
+  });
+
+  it('raises an error when user_name is not given', () => {
+    delete process.env.INPUT_USER_NAME;
+
+    expect(utils.userConfig).toThrow(
+      'Input required and not supplied: user_name'
+    );
+  });
+
+  it('raises an error when user_email is not given', () => {
+    delete process.env.INPUT_USER_EMAIL;
+
+    expect(utils.userConfig).toThrow(
+      'Input required and not supplied: user_email'
+    );
+  });
+
+  it('returns inline git configuration for user from action input', () => {
+    expect(utils.userConfig()).toEqual(['-c', 'user.name=user', '-c', 'user.email=email'])
+  });
+})
 
 describe('getLicensedInput', () => {
   const command = 'licensed';
