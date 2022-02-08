@@ -10,20 +10,19 @@ describe('licensed-ci', () => {
   beforeEach(() => {
     process.env.INPUT_WORKFLOW = 'push';
     sinon.stub(core, 'setFailed');
+    sinon.stub(core, 'group').callsFake((_name, fn) => fn());
   });
 
   afterEach(() => {
     process.env = processEnv;
     sinon.restore();
-  })
+  });
 
   it('raises an error a workflow is not provided', async () => {
     delete process.env.INPUT_WORKFLOW;
     await run();
     expect(core.setFailed.callCount).toEqual(1);
-    expect(core.setFailed.getCall(0).args).toEqual([
-      'Input required and not supplied: workflow'
-    ]);
+    expect(core.setFailed.getCall(0).args).toEqual(['Input required and not supplied: workflow']);
   });
 
   it('raises an error if workflow input is not valid', async () => {
@@ -32,7 +31,7 @@ describe('licensed-ci', () => {
     await run();
     expect(core.setFailed.callCount).toEqual(1);
     expect(core.setFailed.getCall(0).args).toEqual([
-      'Workflow input value "invalid" must be one of: branch, push'
+      'Workflow input value "invalid" must be one of: branch, push',
     ]);
   });
 

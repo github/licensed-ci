@@ -20,7 +20,9 @@ describe('branch workflow', () => {
   const localBranch = `${utils.getOrigin()}/${branch}`;
   const localLicensesBranch = `${utils.getOrigin()}/${licensesBranch}`;
 
-  const pullRequest = require(path.normalize(path.join(__dirname, '..', 'fixtures', 'pullRequest.json')));
+  const pullRequest = require(path.normalize(
+    path.join(__dirname, '..', 'fixtures', 'pullRequest.json')
+  ));
 
   const owner = 'jonabc';
   const repo = 'licensed-ci';
@@ -32,11 +34,11 @@ describe('branch workflow', () => {
   let createPullRequestEndpoint;
 
   beforeEach(() => {
-    process.env.INPUT_GITHUB_TOKEN = token,
-    process.env.INPUT_COMMIT_MESSAGE = commitMessage,
-    process.env.INPUT_CLEANUP_ON_SUCCESS = 'false',
-    process.env.GITHUB_REPOSITORY = `${owner}/${repo}`,
-    process.env.GITHUB_ACTOR = 'actor'
+    process.env.INPUT_GITHUB_TOKEN = token;
+    process.env.INPUT_COMMIT_MESSAGE = commitMessage;
+    process.env.INPUT_CLEANUP_ON_SUCCESS = 'false';
+    process.env.GITHUB_REPOSITORY = `${owner}/${repo}`;
+    process.env.GITHUB_ACTOR = 'actor';
 
     createCommentEndpoint = sinon.stub();
     requestReviewersEndpoint = sinon.stub();
@@ -44,38 +46,47 @@ describe('branch workflow', () => {
     octokit = {
       rest: {
         issues: {
-          createComment: createCommentEndpoint
+          createComment: createCommentEndpoint,
         },
         pulls: {
           create: createPullRequestEndpoint,
-          requestReviewers: requestReviewersEndpoint
-        }
-      }
+          requestReviewers: requestReviewersEndpoint,
+        },
+      },
     };
 
     // stub core methods
     sinon.stub(core, 'info');
     sinon.stub(core, 'warning');
     sinon.stub(core, 'setOutput');
+    sinon.stub(core, 'group').callsFake((_name, fn) => fn());
 
-    sinon.stub(utils, 'userConfig').returns(userConfig)
+    sinon.stub(utils, 'userConfig').returns(userConfig);
     sinon.stub(utils, 'getBranch').returns(branch);
     sinon.stub(utils, 'getLicensedInput').resolves({ command, configFilePath });
     sinon.stub(utils, 'ensureBranch').resolves([localLicensesBranch, localBranch]);
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
     sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
-    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([])
+    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([]);
     sinon.stub(github, 'getOctokit').returns(octokit);
-    sinon.stub(exec, 'exec')
+    sinon
+      .stub(exec, 'exec')
       .resolves(1)
-      .withArgs('git', [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', localBranch]).resolves(0)
-      .withArgs(command, ['cache', '-c', configFilePath]).resolves()
-      .withArgs('git', ['add', '--', ...cachePaths]).resolves()
-      .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(0);
-    sinon.stub(utils, 'checkStatus')
-      .onCall(0).resolves({ success: false })
-      .onCall(1).resolves({ success: true, log: 'licenses-success' });
+      .withArgs('git', [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', localBranch])
+      .resolves(0)
+      .withArgs(command, ['cache', '-c', configFilePath])
+      .resolves()
+      .withArgs('git', ['add', '--', ...cachePaths])
+      .resolves()
+      .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths])
+      .resolves(0);
+    sinon
+      .stub(utils, 'checkStatus')
+      .onCall(0)
+      .resolves({ success: false })
+      .onCall(1)
+      .resolves({ success: true, log: 'licenses-success' });
   });
 
   afterEach(() => {
@@ -107,13 +118,16 @@ describe('branch workflow', () => {
     expect(utils.ensureBranch.getCall(0).args).toEqual([licensesBranch, branch]);
 
     expect(utils.findPullRequest.callCount).toEqual(1);
-    expect(utils.findPullRequest.getCall(0).args).toEqual([octokit, { head: licensesBranch, base: branch }]);
+    expect(utils.findPullRequest.getCall(0).args).toEqual([
+      octokit,
+      { head: licensesBranch, base: branch },
+    ]);
 
     expect(exec.exec.callCount).toEqual(5);
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
       [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', localBranch],
-      { ignoreReturnCode: true }
+      { ignoreReturnCode: true },
     ]);
     expect(exec.exec.getCall(1).args).toEqual([command, ['cache', '-c', configFilePath]]);
 
@@ -127,7 +141,7 @@ describe('branch workflow', () => {
     expect(exec.exec.getCall(3).args).toEqual([
       'git',
       ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths],
-      { ignoreReturnCode: true }
+      { ignoreReturnCode: true },
     ]);
 
     expect(exec.exec.getCall(4).args).toEqual(['git', ['checkout', branch]]);
@@ -204,15 +218,19 @@ describe('branch workflow', () => {
   it('raises an error when github_token is not given', async () => {
     delete process.env.INPUT_GITHUB_TOKEN;
 
-    await expect(workflow()).rejects.toThrow(
-      'Input required and not supplied: github_token'
-    );
+    await expect(workflow()).rejects.toThrow('Input required and not supplied: github_token');
   });
 
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
-      expect(exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`])).toEqual(true);
+      expect(
+        exec.exec.neverCalledWith('git', [
+          'push',
+          utils.getOrigin(),
+          `${localLicensesBranch}:${licensesBranch}`,
+        ])
+      ).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
     });
   });
@@ -222,24 +240,35 @@ describe('branch workflow', () => {
       ...pullRequest,
       id: pullRequest.id + 1,
       number: pullRequest.number + 1,
-      html_url: pullRequest.html_url.replace(pullRequest.number, pullRequest.number + 1)
+      html_url: pullRequest.html_url.replace(pullRequest.number, pullRequest.number + 1),
     };
 
     beforeEach(() => {
       exec.exec
-        .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(1)
-        .withArgs('git', [...userConfig, 'commit', '-m', commitMessage]).resolves()
-        .withArgs('git', ['push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`]).resolves();
+        .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths])
+        .resolves(1)
+        .withArgs('git', [...userConfig, 'commit', '-m', commitMessage])
+        .resolves()
+        .withArgs('git', ['push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`])
+        .resolves();
 
       utils.findPullRequest
-        .withArgs(octokit, { head: licensesBranch, base: branch }).resolves(licensesPullRequest)
-        .withArgs(octokit, { head: branch, "-base": branch }).resolves(pullRequest);
+        .withArgs(octokit, { head: licensesBranch, base: branch })
+        .resolves(licensesPullRequest)
+        .withArgs(octokit, { head: branch, '-base': branch })
+        .resolves(pullRequest);
     });
 
     it('pushes changes to origin', async () => {
       await expect(workflow()).rejects.toThrow();
       expect(exec.exec.calledWith('git', [...userConfig, 'commit', '-m', commitMessage])).toEqual(true);
-      expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`])).toEqual(true);
+      expect(
+        exec.exec.calledWith('git', [
+          'push',
+          utils.getOrigin(),
+          `${localLicensesBranch}:${licensesBranch}`,
+        ])
+      ).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'true')).toEqual(true);
     });
 
@@ -248,24 +277,30 @@ describe('branch workflow', () => {
       createPullRequestEndpoint.resolves({ data: licensesPullRequest });
 
       await expect(workflow()).rejects.toThrow();
-      expect(utils.findPullRequest.calledWith(octokit, { head: licensesBranch, base: branch })).toEqual(true);
+      expect(utils.findPullRequest.calledWith(octokit, { head: licensesBranch, base: branch })).toEqual(
+        true
+      );
       expect(createPullRequestEndpoint.callCount).toEqual(1);
-      expect(createPullRequestEndpoint.getCall(0).args).toEqual([{
-        owner,
-        repo,
-        title: `License updates for ${branch}`,
-        head: licensesBranch,
-        base: branch,
-        body: expect.stringMatching(branch)
-      }]);
+      expect(createPullRequestEndpoint.getCall(0).args).toEqual([
+        {
+          owner,
+          repo,
+          title: `License updates for ${branch}`,
+          head: licensesBranch,
+          base: branch,
+          body: expect.stringMatching(branch),
+        },
+      ]);
 
       expect(requestReviewersEndpoint.callCount).toEqual(1);
-      expect(requestReviewersEndpoint.getCall(0).args).toEqual([{
-        owner,
-        repo,
-        pull_number: licensesPullRequest.number,
-        reviewers: [process.env.GITHUB_ACTOR]
-      }]);
+      expect(requestReviewersEndpoint.getCall(0).args).toEqual([
+        {
+          owner,
+          repo,
+          pull_number: licensesPullRequest.number,
+          reviewers: [process.env.GITHUB_ACTOR],
+        },
+      ]);
 
       // expect pr information set in output
       expect(core.setOutput.calledWith('pr_url', licensesPullRequest.html_url)).toEqual(true);
@@ -276,12 +311,12 @@ describe('branch workflow', () => {
     it('handles failures when requesting the actor as a PR reviewer', async () => {
       utils.findPullRequest.withArgs(octokit, { head: licensesBranch, base: branch }).resolves(null);
       createPullRequestEndpoint.resolves({ data: licensesPullRequest });
-      requestReviewersEndpoint.rejects(new Error('request reviewer failed'))
+      requestReviewersEndpoint.rejects(new Error('request reviewer failed'));
 
       await expect(workflow()).rejects.toThrow();
 
       // expect pr information set in output
-      expect(core.warning.callCount).toEqual(1)
+      expect(core.warning.callCount).toEqual(1);
       expect(core.warning.calledWith('request reviewer failed')).toEqual(true);
 
       // validate that action completed by checking PR information in output
@@ -321,8 +356,8 @@ describe('branch workflow', () => {
 
     it('adds a comment to the parent PR if it exists', async () => {
       await expect(workflow()).rejects.toThrow();
-      const createCommentArgs = createCommentEndpoint.args.find(args =>
-        args[0].issue_number == pullRequest.number
+      const createCommentArgs = createCommentEndpoint.args.find(
+        (args) => args[0].issue_number == pullRequest.number
       );
 
       expect(createCommentArgs).toBeDefined();
@@ -333,16 +368,18 @@ describe('branch workflow', () => {
     });
 
     it('does not add a comment to the parent PR if it does not exist', async () => {
-      utils.findPullRequest.withArgs(octokit, { head: branch, "-base": branch }).resolves(null);
+      utils.findPullRequest.withArgs(octokit, { head: branch, '-base': branch }).resolves(null);
 
       await expect(workflow()).rejects.toThrow();
-      expect(createCommentEndpoint.calledWith({ owner, repo, issue_number: pullRequest.number })).toEqual(false);
+      expect(
+        createCommentEndpoint.calledWith({ owner, repo, issue_number: pullRequest.number })
+      ).toEqual(false);
     });
 
     it('adds a status comment to the licenses PR', async () => {
       await expect(workflow()).rejects.toThrow();
-      const createCommentArgs = createCommentEndpoint.args.find(args =>
-        args[0].issue_number == licensesPullRequest.number
+      const createCommentArgs = createCommentEndpoint.args.find(
+        (args) => args[0].issue_number == licensesPullRequest.number
       );
 
       expect(createCommentArgs).toBeDefined();

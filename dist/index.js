@@ -13,13 +13,14 @@ async function run() {
     const workflowInput = core.getInput('workflow', { required: true });
     const workflow = workflows[workflowInput];
     if (!workflow) {
-      throw new Error(`Workflow input value "${workflowInput}" must be one of: ${Object.keys(workflows).join(', ')}`);
+      throw new Error(
+        `Workflow input value "${workflowInput}" must be one of: ${Object.keys(workflows).join(', ')}`
+      );
     }
 
     await utils.configureGit();
     await workflow();
-  }
-  catch (error) {
+  } catch (error) {
     core.setFailed(error.message);
   }
 }
@@ -42,8 +43,15 @@ const stream = __nccwpck_require__(2781);
 const ORIGIN = 'licensed-ci-origin';
 
 async function configureGit() {
-  const token = core.getInput('github_token', { required: true });
-  await exec.exec('git', ['remote', 'add', ORIGIN, `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}`]);
+  await core.group('Configuring git', async () => {
+    const token = core.getInput('github_token', { required: true });
+    await exec.exec('git', [
+      'remote',
+      'add',
+      ORIGIN,
+      `https://x-access-token:${token}@github.com/${process.env.GITHUB_REPOSITORY}`,
+    ]);
+  });
 }
 
 async function extraHeaderConfigWithoutAuthorization() {
@@ -52,36 +60,33 @@ async function extraHeaderConfigWithoutAuthorization() {
 
   // check for both broad and specific extraheader values
   for (const key of ['http.extraheader', `http.${serverUrl.origin}/.extraheader`]) {
-    // always set an empyt string to clear any stored config values for the key
+    // always set an empty string to clear any stored config values for the key
     configValues.push(`${key}=`);
 
     const options = {
       ignoreReturnCode: true,
       listeners: {
-        stdout: data => {
+        stdout: (data) => {
           // if this isn't an authorization header, keep using it
           const headers = data.toString().match(/[^\r\n]+/g);
-          headers.map(header => header.trim())
-                 .filter(header => !header.toLowerCase().startsWith('authorization:'))
-                 .forEach(header => configValues.push(`${key}=${header}`));
-
-        }
-      }
+          headers
+            .map((header) => header.trim())
+            .filter((header) => !header.toLowerCase().startsWith('authorization:'))
+            .forEach((header) => configValues.push(`${key}=${header}`));
+        },
+      },
     };
     await exec.exec('git', ['config', '--get-all', key], options);
   }
 
-  return configValues.flatMap(value => ['-c', value]);
+  return configValues.flatMap((value) => ['-c', value]);
 }
 
 function userConfig() {
   const userName = core.getInput('user_name', { required: true });
   const userEmail = core.getInput('user_email', { required: true });
 
-  return [
-    '-c', `user.name=${userName}`,
-    '-c', `user.email=${userEmail}`
-  ]
+  return ['-c', `user.name=${userName}`, '-c', `user.email=${userEmail}`];
 }
 
 async function getLicensedInput() {
@@ -98,9 +103,7 @@ async function checkStatus(command, configFilePath) {
   let log = '';
   const options = {
     ignoreReturnCode: true,
-    listeners: {
-      stdout: data => log += data.toString()
-    }
+    listeners: { stdout: (data) => (log += data.toString()) },
   };
   const exitCode = await exec.exec(command, ['status', '-c', configFilePath], options);
   return { success: exitCode === 0, log };
@@ -125,14 +128,16 @@ async function getCachePaths(command, configFilePath) {
   const options = {
     ignoreReturnCode: true,
     listeners: {
-      stdout: data => { output += data.toString() }
+      stdout: (data) => {
+        output += data.toString();
+      },
     },
-    outStream: new stream.Writable({ write: () => {} })
+    outStream: new stream.Writable({ write: () => {} }),
   };
 
   const exitCode = await exec.exec(command, ['env', '--format', 'json', '-c', configFilePath], options);
   if (exitCode === 0 && output) {
-    return JSON.parse(output).apps.map(app => app.cache_path);
+    return JSON.parse(output).apps.map((app) => app.cache_path);
   }
 
   // if `licensed env` failed or there was no output, add updated files for the whole repo
@@ -140,13 +145,16 @@ async function getCachePaths(command, configFilePath) {
 }
 
 async function filterCachePaths(paths) {
-  const filteredPaths = await Promise.all(paths.map(path => 
-    // exclude paths that don't exist
-    fs.promises.access(path, fs.constants.R_OK)
-               .then(() => path)
-               .catch(() => null)
-  ));
-  return filteredPaths.filter(p=>p);
+  const filteredPaths = await Promise.all(
+    paths.map((path) =>
+      // exclude paths that don't exist
+      fs.promises
+        .access(path, fs.constants.R_OK)
+        .then(() => path)
+        .catch(() => null)
+    )
+  );
+  return filteredPaths.filter((p) => p);
 }
 
 async function ensureBranch(branch, parent) {
@@ -159,15 +167,25 @@ async function ensureBranch(branch, parent) {
     fetchOpts.push('--unshallow');
   }
 
-  let exitCode = await exec.exec('git', ['fetch', ...fetchOpts, ORIGIN, branch], { ignoreReturnCode: true });
+  let exitCode = await exec.exec('git', ['fetch', ...fetchOpts, ORIGIN, branch], {
+    ignoreReturnCode: true,
+  });
   if (parent && branch != parent) {
-    await exec.exec('git', ['fetch', ORIGIN, parent], { ignoreReturnCode: true});
+    await exec.exec('git', ['fetch', ORIGIN, parent], { ignoreReturnCode: true });
   }
 
   // change to the target branch
-  exitCode = await exec.exec('git', ['checkout', '--force', '-B', localBranch, `refs/remotes/${ORIGIN}/${branch}`], { ignoreReturnCode: true });
-  if (exitCode != 0 && branch !== parent) {    
-    exitCode = await exec.exec('git', ['checkout', '--force', '-B', localBranch, `refs/remotes/${ORIGIN}/${parent}`], { ignoreReturnCode: true });
+  exitCode = await exec.exec(
+    'git',
+    ['checkout', '--force', '-B', localBranch, `refs/remotes/${ORIGIN}/${branch}`],
+    { ignoreReturnCode: true }
+  );
+  if (exitCode != 0 && branch !== parent) {
+    exitCode = await exec.exec(
+      'git',
+      ['checkout', '--force', '-B', localBranch, `refs/remotes/${ORIGIN}/${parent}`],
+      { ignoreReturnCode: true }
+    );
   }
 
   if (exitCode != 0) {
@@ -177,10 +195,10 @@ async function ensureBranch(branch, parent) {
   return [localBranch, localParent];
 }
 
-async function findPullRequest(octokit, options={}) {
+async function findPullRequest(octokit, options = {}) {
   let query = `is:pr is:open repo:${process.env.GITHUB_REPOSITORY}`;
   for (let key in options) {
-    query += ` ${key}:"${options[key]}"`
+    query += ` ${key}:"${options[key]}"`;
   }
 
   const { data } = await octokit.rest.search.issuesAndPullRequests({ q: query });
@@ -200,14 +218,16 @@ async function closePullRequest(octokit, pullRequest) {
   const { data: pull } = await octokit.rest.pulls.update({
     ...github.context.repo,
     pull_number: pullRequest.number,
-    state: 'closed'
+    state: 'closed',
   });
 
   return pull;
 }
 
 async function deleteBranch(branch) {
-  const exitCode = await exec.exec('git', ['ls-remote', '--exit-code', ORIGIN, branch], { ignoreReturnCode: true });
+  const exitCode = await exec.exec('git', ['ls-remote', '--exit-code', ORIGIN, branch], {
+    ignoreReturnCode: true,
+  });
   if (exitCode === 0) {
     await exec.exec('git', ['push', ORIGIN, '--delete', branch]);
   }
@@ -226,7 +246,7 @@ module.exports = {
   closePullRequest,
   deleteBranch,
   checkStatus,
-  getOrigin: () => ORIGIN
+  getOrigin: () => ORIGIN,
 };
 
 
@@ -485,7 +505,9 @@ async function commentOnPullRequest(octokit, pullRequest) {
   const comment = core.getInput('pr_comment');
   if (comment) {
     core.info(`Adding comment ${comment}`);
-    core.warning('"pr_comment" is deprecated.  Please use the "pr_url" and "pr_number" step outputs to script actions on an available pull request.');
+    core.warning(
+      '"pr_comment" is deprecated. Please use the "pr_url" and "pr_number" step outputs to script actions on an available pull request.'
+    );
 
     await octokit.rest.issues.createComment({
       ...github.context.repo,
@@ -503,8 +525,10 @@ async function run() {
 
   const { command, configFilePath } = await utils.getLicensedInput();
 
-  // pre-check, if status succeeds no need to recache
-  let statusResult = await utils.checkStatus(command, configFilePath);
+  // pre-check, if status succeeds no need to re-cache
+  let statusResult = await core.group('Pre-Checking license status', async () => {
+    return utils.checkStatus(command, configFilePath);
+  });
   if (statusResult.success) {
     return;
   }
@@ -517,42 +541,53 @@ async function run() {
   const pullRequest = await utils.findPullRequest(octokit, { head: branch });
 
   // cache any metadata updates
-  await exec.exec(command, ['cache', '-c', configFilePath]);
+  await core.group('Refreshing cache', async () => {
+    await exec.exec(command, ['cache', '-c', configFilePath]);
 
-  // stage any changes, checking only configured cache paths if possible
-  const cachePaths = await utils.getCachePaths(command, configFilePath);
-  await exec.exec('git', ['add', '--', ...(await utils.filterCachePaths(cachePaths))]);
+    // stage any changes, checking only configured cache paths if possible
+    const cachePaths = await utils.getCachePaths(command, configFilePath);
+    await exec.exec('git', ['add', '--', ...(await utils.filterCachePaths(cachePaths))]);
 
-  // check for any changes, checking only configured cache paths if possible
-  const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths], { ignoreReturnCode: true });
-  if (exitCode > 0) {
-    // if files were changed, push them back up to origin using the passed in github token
-    const commitMessage = core.getInput('commit_message', { required: true });
-    const userConfig = utils.userConfig();
-    await exec.exec('git', [...userConfig, 'commit', '-m', commitMessage]);
+    // check for any changes, checking only configured cache paths if possible
+    const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths], {
+      ignoreReturnCode: true,
+    });
+    if (exitCode > 0) {
+      // if files were changed, push them back up to origin using the passed in github token
+      const commitMessage = core.getInput('commit_message', { required: true });
+      const userConfig = utils.userConfig();
+      await exec.exec('git', [...userConfig, 'commit', '-m', commitMessage]);
 
-    const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
-    await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), `${localBranch}:${branch}`]);
-    licensesUpdated = true;
+      const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
+      await exec.exec('git', [
+        ...extraHeadersConfig,
+        'push',
+        utils.getOrigin(),
+        `${localBranch}:${branch}`,
+      ]);
+      licensesUpdated = true;
 
-    // if a PR comment was supplied and PR exists, add comment
-    if (pullRequest) {
-      await commentOnPullRequest(octokit, pullRequest);
+      // if a PR comment was supplied and PR exists, add comment
+      if (pullRequest) {
+        await commentOnPullRequest(octokit, pullRequest);
+      }
     }
-  }
 
-  core.setOutput('licenses_updated', licensesUpdated.toString());
+    core.setOutput('licenses_updated', licensesUpdated.toString());
+  });
 
   if (pullRequest) {
     core.setOutput('pr_url', pullRequest.html_url);
     core.setOutput('pr_number', pullRequest.number);
   }
 
-  // after recaching, check status
-  statusResult = await utils.checkStatus(command, configFilePath);
-  if (!statusResult.success) {
-    throw new Error('Cached metadata checks failed');
-  }
+  // after reaching, check status
+  await core.group('Check license status', async () => {
+    const statusResult = await utils.checkStatus(command, configFilePath);
+    if (!statusResult.success) {
+      throw new Error('Cached metadata checks failed');
+    }
+  });
 }
 
 module.exports = run;

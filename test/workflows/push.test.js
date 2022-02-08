@@ -36,15 +36,16 @@ describe('push workflow', () => {
     octokit = {
       rest: {
         issues: {
-          createComment: createCommentEndpoint
-        }
-      }
+          createComment: createCommentEndpoint,
+        },
+      },
     };
 
     // stub core methods
     sinon.stub(core, 'info');
     sinon.stub(core, 'warning');
     sinon.stub(core, 'setOutput');
+    sinon.stub(core, 'group').callsFake((_name, fn) => fn());
 
     sinon.stub(utils, 'userConfig').returns(userConfig);
     sinon.stub(utils, 'getBranch').returns('branch');
@@ -53,16 +54,23 @@ describe('push workflow', () => {
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
     sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
-    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([])
+    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([]);
     sinon.stub(github, 'getOctokit').returns(octokit);
-    sinon.stub(exec, 'exec')
+    sinon
+      .stub(exec, 'exec')
       .rejects()
-      .withArgs(command, ['cache', '-c', configFilePath]).resolves()
-      .withArgs('git', ['add', '--', ...cachePaths]).resolves()
-      .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(0);
-    sinon.stub(utils, 'checkStatus')
-      .onCall(0).resolves({ success: false })
-      .onCall(1).resolves({ success: true });
+      .withArgs(command, ['cache', '-c', configFilePath])
+      .resolves()
+      .withArgs('git', ['add', '--', ...cachePaths])
+      .resolves()
+      .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths])
+      .resolves(0);
+    sinon
+      .stub(utils, 'checkStatus')
+      .onCall(0)
+      .resolves({ success: false })
+      .onCall(1)
+      .resolves({ success: true });
   });
 
   afterEach(() => {
@@ -82,10 +90,8 @@ describe('push workflow', () => {
 
   it('raises an error if github_token is not set', async () => {
     delete process.env.INPUT_GITHUB_TOKEN;
-    await expect(workflow()).rejects.toThrow(
-      'Input required and not supplied: github_token'
-    );
-  })
+    await expect(workflow()).rejects.toThrow('Input required and not supplied: github_token');
+  });
 
   it('runs a licensed ci workflow', async () => {
     await workflow();
@@ -115,9 +121,7 @@ describe('push workflow', () => {
 
     expect(exec.exec.getCall(1).args).toEqual(['git', ['add', '--', ...cachePaths]]);
     expect(exec.exec.getCall(2).args).toEqual(
-      expect.arrayContaining(
-        ['git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]]
-      )
+      expect.arrayContaining(['git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]])
     );
 
     expect(createCommentEndpoint.callCount).toEqual(0);
@@ -145,7 +149,9 @@ describe('push workflow', () => {
   describe('with no cached file changes', () => {
     it('does not push changes to origin', async () => {
       await workflow();
-      expect(exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), `${localBranch}:${branch}`])).toEqual(true);
+      expect(
+        exec.exec.neverCalledWith('git', ['push', utils.getOrigin(), `${localBranch}:${branch}`])
+      ).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'false')).toEqual(true);
     });
   });
@@ -158,23 +164,26 @@ describe('push workflow', () => {
       process.env.INPUT_PR_COMMENT = comment;
 
       exec.exec
-        .withArgs('licensed').resolves(0)
-        .withArgs('git').resolves(0)
-        .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths]).resolves(1);
+        .withArgs('licensed')
+        .resolves(0)
+        .withArgs('git')
+        .resolves(0)
+        .withArgs('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths])
+        .resolves(1);
     });
 
     it('raises an error when github_token is not given', async () => {
       delete process.env.INPUT_GITHUB_TOKEN;
 
-      await expect(workflow()).rejects.toThrow(
-        'Input required and not supplied: github_token'
-      );
+      await expect(workflow()).rejects.toThrow('Input required and not supplied: github_token');
     });
 
     it('pushes changes to origin', async () => {
       await workflow();
       expect(exec.exec.calledWith('git', [...userConfig, 'commit', '-m', commitMessage])).toEqual(true);
-      expect(exec.exec.calledWith('git', ['push', utils.getOrigin(), `${localBranch}:${branch}`])).toEqual(true);
+      expect(
+        exec.exec.calledWith('git', ['push', utils.getOrigin(), `${localBranch}:${branch}`])
+      ).toEqual(true);
       expect(core.setOutput.calledWith('licenses_updated', 'true')).toEqual(true);
     });
 
@@ -196,12 +205,14 @@ describe('push workflow', () => {
 
       await workflow();
       expect(createCommentEndpoint.callCount).toEqual(1);
-      expect(createCommentEndpoint.getCall(0).args).toEqual([{
-        owner,
-        repo,
-        issue_number: pullRequest.number,
-        body: comment
-      }]);
+      expect(createCommentEndpoint.getCall(0).args).toEqual([
+        {
+          owner,
+          repo,
+          issue_number: pullRequest.number,
+          body: comment,
+        },
+      ]);
     });
 
     it('sets pr details in step output', async () => {
