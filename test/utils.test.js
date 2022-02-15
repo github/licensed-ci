@@ -1,3 +1,4 @@
+const core = require('@actions/core');
 const exec = require('@actions/exec');
 const fs = require('fs');
 const path = require('path');
@@ -10,6 +11,7 @@ describe('configureGit', () => {
   beforeEach(() => {
     process.env.INPUT_GITHUB_TOKEN = 'token';
     process.env.GITHUB_REPOSITORY = 'jonabc/licensed-ci';
+    sinon.stub(core, 'group').callsFake((_name, fn) => fn());
   })
 
   afterEach(() => {

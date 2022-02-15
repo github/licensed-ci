@@ -1,6 +1,9 @@
 # used for all-branch testing
 .licenses.ignored/**/*
 
+# IDE configurations
+.vscode/
+
 # Logs
 logs
 *.log

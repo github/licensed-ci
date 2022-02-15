@@ -45,6 +45,7 @@ describe('push workflow', () => {
     sinon.stub(core, 'info');
     sinon.stub(core, 'warning');
     sinon.stub(core, 'setOutput');
+    sinon.stub(core, 'group').callsFake((_name, fn) => fn());
 
     sinon.stub(utils, 'userConfig').returns(userConfig);
     sinon.stub(utils, 'getBranch').returns('branch');
