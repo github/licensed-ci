@@ -10,6 +10,7 @@ describe('licensed-ci', () => {
   beforeEach(() => {
     process.env.INPUT_WORKFLOW = 'push';
     sinon.stub(core, 'setFailed');
+    sinon.stub(core, 'group').callsFake((_name, fn) => fn());
   });
 
   afterEach(() => {
