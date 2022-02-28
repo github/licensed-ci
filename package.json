@@ -1,6 +1,6 @@
 {
   "name": "licensed-ci",
-  "version": "1.5.8",
+  "version": "1.5.9",
   "description": "GitHub Actions CI workflow for github/licensed",
   "main": "lib/index.js",
   "scripts": {
