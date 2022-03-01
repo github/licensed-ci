@@ -144,7 +144,13 @@ jobs:
 
 This action supports the `push` and `pull_request` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
 
-### Using licensed-ci with permission restrictions on GITHUB_TOKEN
+### Authentication
+
+#### Accessing private repositories during the licensed-ci action
+
+The default `GITHUB_TOKEN` authentication token provided by GitHub Actions does not have read access to any other GitHub repositories.  If running [github/licensed](https://github.com/github/licensed) in your repo requires access to a private GitHub repository, please set the `github_token` workflow input to a PAT from a user with access to necessary private repositories.
+
+#### Using licensed-ci with permission restrictions on GITHUB_TOKEN
 
 If your action workflow [restricts which permissions](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token) are granted to `GITHUB_TOKEN`, please ensure that both `contents` and `pull-requests` are set to `write`. As part of an Actions workflow, `licensed-ci` can push license metadata file updates to a repo, comment on existing PRs, and open new PRs.
 
