@@ -56,7 +56,9 @@ Notes:
 
 ## Usage
 
-Basic usage with a licensed release package using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)
+### Basic usage with a licensed release package using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)
+
+For caching the Gem dependencies see [Basic usage installing licensed gem using bundler + Gemfile](#usage-bundler)
 
 ```yaml
 on:
@@ -82,28 +84,35 @@ permissions:
 jobs:
   licensed:
     steps:
-    - uses: actions/checkout@v2
-    - uses: jonabc/setup-licensed@v1
-      with:
-        version: 3.x
-    - run: npm install # install your projects dependencies in local environment
-    - id: licensed
-      uses: jonabc/licensed-ci@v1
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-    - uses: actions/github-script@0.2.0
-      if: always() && steps.licensed.outputs.pr_number
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          github.issues.createComment({
-            ...context.repo,
-            issue_number: ${{ steps.licensed.outputs.pr_number }}
-            body: 'My custom PR message'
-          })
+      - uses: actions/checkout@v2
+      - uses: jonabc/setup-licensed@v1
+        with:
+          version: 3.x
+      #region Example for Node projects
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16
+          cache: npm # cache dependencies for faster subsequent runs.
+      - run: npm install # install your projects dependencies in local environment
+      #endregion
+      - id: licensed
+        uses: jonabc/licensed-ci@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/github-script@0.2.0
+        if: always() && steps.licensed.outputs.pr_number
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.issues.createComment({
+              ...context.repo,
+              issue_number: ${{ steps.licensed.outputs.pr_number }}
+              body: 'My custom PR message'
+            })
+
 ```
 
-Basic usage installing licensed gem using bundler + Gemfile
+### <a name="usage-bundler"></a>Basic usage installing licensed gem using bundler + Gemfile
 
 ```yaml
 on:
@@ -128,21 +137,51 @@ permissions:
 
 jobs:
   licensed:
+    env: # optionally configure the Gemfile used
+      BUNDLE_GEMFILE: ${{ github.workspace }}/licensed.gemfile
     steps:
-    - uses: actions/checkout@v2
-    - uses: actions/setup-ruby@v1
-      with:
-        ruby-version: 2.6.x
-    - run: bundle install
-    - uses: jonabc/licensed-ci@v1
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        command: 'bundle exec licensed' # or bin/licensed when using binstubs
+      - uses: actions/checkout@v2
+      - uses: actions/setup-ruby@v1
+        with:
+          ruby-version: 2.6
+          bundler-cache: true # improve performance on subsequent runs
+          cache-version: 1
+      #region Example for Node projects
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16
+          cache: npm # cache dependencies for faster subsequent runs.
+      - run: npm install # install your projects dependencies in local environment
+      #endregion
+      - uses: jonabc/licensed-ci@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          command: "bundle exec licensed" # or bin/licensed when using binstubs
+```
+
+### Scheduling licensed workflow to run regularly using `workflow_dispatch` event.
+
+```yaml
+name: schedule-licensed
+
+on:
+  schedule:
+    - cron: '0 10 * * 2' # e.g. every 10:00 on Tuesdays.
+
+jobs:
+  dispatch-licensed:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch licensed workflow
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: licensed
+          token: ${{ secrets.USER_TOKEN }} # needs a Github User Token to dispatch the action
 ```
 
 ### Supported Events
 
-This action supports the `push` and `pull_request` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
+This action supports the `push`, `pull_request` and `workflow_dispatch` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
 
 ### Authentication
 
