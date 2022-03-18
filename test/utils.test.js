@@ -207,6 +207,10 @@ describe('checkStatus', () => {
 });
 
 describe('getBranch', () => {
+  afterEach(() => {
+    process.env = processEnv;
+  });
+
   it('raises an error when ref is not found', () => {
     expect(() => utils.getBranch({})).toThrow(
       'Unable to determine a HEAD branch reference for undefined event type'
@@ -238,6 +242,11 @@ describe('getBranch', () => {
     expect(() => utils.getBranch({ ref: 'refs/pulls/123/merge' })).toThrow(
       'Unable to determine a HEAD branch reference for undefined event type'
     );
+  });
+
+  it('returns a user-provided input value', () => {
+    process.env.INPUT_BRANCH = 'branch';
+    expect(utils.getBranch({})).toEqual('branch');
   });
 });
 

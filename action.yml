@@ -36,6 +36,9 @@ inputs:
     description: 'Whether to close open PRs and delete license branches on CI success in user branch. Only used by `branch` workflow'
     required: false
     default: 'false'
+  branch:
+    description: 'Branch to run the action on when using `workflow_dispatch` or `schedule` event triggers'
+    required: false
 outputs:
   licenses_branch:
     description: The branch containing licensed-ci changes.
