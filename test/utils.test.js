@@ -231,6 +231,14 @@ describe('getBranch', () => {
 
     expect(utils.getBranch(context)).toEqual('branch');
   });
+
+  it('returns a head branch name from context.ref if not otherwise available', () => {
+    expect(utils.getBranch({ ref: 'refs/heads/branch' })).toEqual('branch');
+
+    expect(() => utils.getBranch({ ref: 'refs/pulls/123/merge' })).toThrow(
+      'Unable to determine a HEAD branch reference for undefined event type'
+    );
+  });
 });
 
 describe('getCachePaths', () => {
