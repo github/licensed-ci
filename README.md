@@ -56,9 +56,11 @@ Notes:
 
 ## Usage
 
-### Basic usage with a licensed release package using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)
+*[See a full example below](#full-nodejs-example)*.
 
-For caching the Gem dependencies see [Basic usage installing licensed gem using bundler + Gemfile](#usage-bundler)
+### Supported Events
+
+This action supports the `push`, `pull_request` and `workflow_dispatch` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
 
 ```yaml
 on:
@@ -66,6 +68,7 @@ on:
   push:
     branches:
       - main
+    tags-ignore: '**'
   # run on pull request events with changes to code
   pull_request:
     types:
@@ -74,13 +77,32 @@ on:
       - synchronize
   # run on demand
   workflow_dispatch:
+```
 
-# ensure that the action can push changes to the repo and edit PRs
-# when using `secrets.GITHUB_TOKEN`
-permissions:
-  pull-requests: write
-  contents: write
+### Basic Ruby usage using Bundler + Gemfile
 
+```yaml
+jobs:
+  licensed:
+    env: # optionally configure the Gemfile used
+      BUNDLE_GEMFILE: ${{ github.workspace }}/licensed.gemfile
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-ruby@v1
+        with:
+          ruby-version: 2.6
+          bundler-cache: true # improve performance on subsequent runs
+          cache-version: 1
+      - run: xxx # Install project dependencies here.
+      - uses: jonabc/licensed-ci@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          command: "bundle exec licensed" # or bin/licensed when using binstubs
+```
+
+### Basic non-Ruby usage using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)
+
+```yaml
 jobs:
   licensed:
     steps:
@@ -88,14 +110,20 @@ jobs:
       - uses: jonabc/setup-licensed@v1
         with:
           version: 3.x
-      #region Example for Node projects
-      - uses: actions/setup-node@v2
+      - run: xxx # Install project dependencies here.
+      - uses: jonabc/licensed-ci@v1
         with:
-          node-version: 16
-          cache: npm # cache dependencies for faster subsequent runs.
-      - run: npm install # install your projects dependencies in local environment
-      #endregion
-      - id: licensed
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### Using outputs to make a PR comment
+
+```yaml
+jobs:
+  licensed:
+    steps:
+      - # ...
+      - id: licensed # save the id of the step to reference later
         uses: jonabc/licensed-ci@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -109,10 +137,25 @@ jobs:
               issue_number: ${{ steps.licensed.outputs.pr_number }}
               body: 'My custom PR message'
             })
-
 ```
 
-### <a name="usage-bundler"></a>Basic usage installing licensed gem using bundler + Gemfile
+### Authentication
+
+#### Accessing private repositories during the licensed-ci action
+
+The default `GITHUB_TOKEN` authentication token provided by GitHub Actions does not have read access to any other GitHub repositories.  If running [github/licensed](https://github.com/github/licensed) in your repo requires access to a private GitHub repository, please set the `github_token` workflow input to a PAT from a user with access to necessary private repositories.
+
+#### Using licensed-ci with permission restrictions on GITHUB_TOKEN
+
+If your action workflow [restricts which permissions](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token) are granted to `GITHUB_TOKEN`, please ensure that both `contents` and `pull-requests` are set to `write`. As part of an Actions workflow, `licensed-ci` can push license metadata file updates to a repo, comment on existing PRs, and open new PRs.
+
+```yaml
+permissions:
+  pull-requests: write
+  contents: write
+```
+
+### Full Node.js example
 
 ```yaml
 on:
@@ -137,8 +180,6 @@ permissions:
 
 jobs:
   licensed:
-    env: # optionally configure the Gemfile used
-      BUNDLE_GEMFILE: ${{ github.workspace }}/licensed.gemfile
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-ruby@v1
@@ -146,54 +187,28 @@ jobs:
           ruby-version: 2.6
           bundler-cache: true # improve performance on subsequent runs
           cache-version: 1
-      #region Example for Node projects
       - uses: actions/setup-node@v2
         with:
           node-version: 16
           cache: npm # cache dependencies for faster subsequent runs.
-      - run: npm install # install your projects dependencies in local environment
-      #endregion
-      - uses: jonabc/licensed-ci@v1
+      # install your projects dependencies
+      - run: npm install --production --ignore-scripts
+      - id: licensed
+        uses: jonabc/licensed-ci@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          command: "bundle exec licensed" # or bin/licensed when using binstubs
-```
-
-### Scheduling licensed workflow to run regularly using `workflow_dispatch` event.
-
-```yaml
-name: schedule-licensed
-
-on:
-  schedule:
-    - cron: '0 10 * * 2' # e.g. every 10:00 on Tuesdays.
-
-jobs:
-  dispatch-licensed:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Dispatch licensed workflow
-        uses: benc-uk/workflow-dispatch@v1
+          command: bundle exec licensed # or bin/licensed when using binstubs
+      - uses: actions/github-script@0.2.0
+        if: always() && steps.licensed.outputs.pr_number
         with:
-          workflow: licensed
-          token: ${{ secrets.USER_TOKEN }} # needs a Github User Token to dispatch the action
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.issues.createComment({
+              ...context.repo,
+              issue_number: ${{ steps.licensed.outputs.pr_number }}
+              body: 'My custom PR message'
+            })
 ```
-
-### Supported Events
-
-This action supports the `push`, `pull_request` and `workflow_dispatch` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
-
-### Authentication
-
-#### Accessing private repositories during the licensed-ci action
-
-The default `GITHUB_TOKEN` authentication token provided by GitHub Actions does not have read access to any other GitHub repositories.  If running [github/licensed](https://github.com/github/licensed) in your repo requires access to a private GitHub repository, please set the `github_token` workflow input to a PAT from a user with access to necessary private repositories.
-
-#### Using licensed-ci with permission restrictions on GITHUB_TOKEN
-
-If your action workflow [restricts which permissions](https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token) are granted to `GITHUB_TOKEN`, please ensure that both `contents` and `pull-requests` are set to `write`. As part of an Actions workflow, `licensed-ci` can push license metadata file updates to a repo, comment on existing PRs, and open new PRs.
-
-Dependabot 
 
 ## License
 
