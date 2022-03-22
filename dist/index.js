@@ -452,7 +452,7 @@ async function run() {
       }
     }
 
-    await exec.exec('git', ['checkout', '--track', localUserBranch]);
+    await exec.exec('git', ['checkout', branch]);
   }
 
   core.setOutput('licenses_updated', licensesUpdated.toString());
