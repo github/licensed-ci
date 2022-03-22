@@ -122,7 +122,7 @@ jobs:
 jobs:
   licensed:
     steps:
-      - # ...
+      - # environment setup ...
       - id: licensed # save the id of the step to reference later
         uses: jonabc/licensed-ci@v1
         with:
