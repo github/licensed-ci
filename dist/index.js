@@ -109,6 +109,12 @@ async function checkStatus(command, configFilePath) {
 }
 
 function getBranch(context) {
+  // allow the user to specify a branch to run the action on
+  const branch = core.getInput('branch', { required: false });
+  if (branch) {
+    return branch;
+  }
+
   if (context.payload && context.payload.pull_request) {
     return context.payload.pull_request.head.ref;
   } else if (context.payload && context.payload.ref) {
@@ -117,6 +123,8 @@ function getBranch(context) {
       throw new Error(`${ref} does not reference a branch`);
     }
     return ref.replace('refs/heads/', '');
+  } else if (context.ref && context.ref.startsWith('refs/heads')) {
+    return context.ref.replace('refs/heads/', '');
   }
 
   throw new Error(`Unable to determine a HEAD branch reference for ${context.eventName} event type`);

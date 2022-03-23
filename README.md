@@ -60,7 +60,7 @@ Notes:
 
 ### Supported Events
 
-This action supports the `push`, `pull_request` and `workflow_dispatch` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
+This action supports the `push`, `pull_request`, `workflow_dispatch`, and `scheduled` events.  When using `push`, the action workflow should include `tags-ignore: '**'` to avoid running the action on pushed tags.  New tags point to code but do not represent new or changed code that could include updated dependencies.
 
 ```yaml
 on:
@@ -77,6 +77,9 @@ on:
       - synchronize
   # run on demand
   workflow_dispatch:
+  # run on a schedule against the repository's default branch
+  schedule:
+    - cron: '0 8 * * *' # run every day at 8am
 ```
 
 ### Basic Ruby usage using Bundler + Gemfile
