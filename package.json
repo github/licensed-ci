@@ -32,7 +32,7 @@
   "devDependencies": {
     "@vercel/ncc": "^0.33",
     "eslint": "^8.15.0",
-    "husky": "^7.0.4",
+    "husky": "^8.0.1",
     "jest": "^28.0",
     "nock": "^13.2.4",
     "sinon": "^14.0.0"
