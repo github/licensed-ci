@@ -132,7 +132,7 @@ describe('userConfig', () => {
 
 describe('isDependabotContext', () => {
   it('returns false', () => {
-    expect(utils.isDependabotContext({})).toEqual(false);
+    expect(utils.isDependabotContext({payload: {}})).toEqual(false);
   });
 
   it('returns true if pull_request.user.login is "dependabot[bot]"', () => {
@@ -149,7 +149,7 @@ describe('isDependabotContext', () => {
   });
 
   it('returns true if actor is "dependabot[bot]"', () => {
-    const context = {actor: 'dependabot[bot]'};
+    const context = {payload: {}, actor: 'dependabot[bot]'};
     expect(utils.isDependabotContext(context)).toEqual(true);
   });
 });

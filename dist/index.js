@@ -87,7 +87,7 @@ function userConfig() {
 }
 
 function isDependabotContext(context) {
-  return context.payload?.pull_request?.user?.login === 'dependabot[bot]' ||
+  return (context.payload.pull_request && context.payload.pull_request.user.login === 'dependabot[bot]') ||
          context.actor === 'dependabot[bot]';
 }
 
@@ -2280,6 +2280,7 @@ class Context {
 }
 exports.Context = Context;
 //# sourceMappingURL=context.js.map
+
 
 /***/ }),
 
