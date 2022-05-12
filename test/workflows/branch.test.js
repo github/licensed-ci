@@ -33,7 +33,6 @@ describe('branch workflow', () => {
 
   beforeEach(() => {
     process.env.INPUT_GITHUB_TOKEN = token,
-    process.env.INPUT_COMMIT_MESSAGE = commitMessage,
     process.env.INPUT_CLEANUP_ON_SUCCESS = 'false',
     process.env.GITHUB_REPOSITORY = `${owner}/${repo}`,
     process.env.GITHUB_ACTOR = 'actor'
@@ -65,7 +64,8 @@ describe('branch workflow', () => {
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
     sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
-    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([])
+    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([]);
+    sinon.stub(utils, 'getCommitMessage').returns(commitMessage);
     sinon.stub(github, 'getOctokit').returns(octokit);
     sinon.stub(exec, 'exec')
       .resolves(1)
