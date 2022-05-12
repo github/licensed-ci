@@ -4,7 +4,7 @@ const github = require('@actions/github');
 const path = require('path');
 const sinon = require('sinon');
 const utils = require('../../lib/utils');
-const workflow = require('../../lib/workflows/push');
+const { run: workflow } = require('../../lib/workflows/push');
 
 const processEnv = process.env;
 
