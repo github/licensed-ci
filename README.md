@@ -44,6 +44,7 @@ Notes:
   1. `push`
   1. `branch`
 - `cleanup_on_success` - Optional, default: `'false'`.  Only applies to the `branch` workflow.  Set to the string `'true'` to close PRs and delete branches used by the `branch` workflow when `licensed status` succeeds on the parent branch.
+- `dependabot_skip` - Optional, default: `'false'`.  Set to the string `'true'` to prepend `[dependabot skip]` to commit messages when licensed-ci is run on a Pull Request or commit authored by Dependabot.  This will signal to Dependabot that it is safe to perform its normal operations even though non-Dependabot commits are present on the Dependabot Pull Request.
 
 ## Outputs
 
