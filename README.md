@@ -30,6 +30,16 @@ Notes:
 - If the licenses branch already exists, it is rebased onto the target branch before caching metadata.
 - If an open pull request for the branch already exists, no further action is taken.
 
+### Push for changes from bots, Branch for changes from users (`push_for_bots`)
+
+This is a hybrid workflow, choosing either the `branch` or `push` workflow depending on the context that triggered `licensed-ci`.  The intended result is that dependency changes made by bots will run the `push` workflow, while dependency changes initiated by humans will run the `branch` workflow.  Choosing the `push` workflow for changes made by bots requires less human interaction overall in reviewing and merging multiple pull requests.
+
+The workflow that is run is chosen based on a few different checks:
+
+1. If the `branch` workflow has already created a `*-licenses` branch, continue to use the `branch` workflow
+1. If the action payload's [sender](https://docs.github.com/en/developers/webhooks-and-events/webhooks/webhook-events-and-payloads#webhook-payload-object-common-properties) field is for a user account, use the `branch` workflow
+1. If the above checks don't pass, use the `push` workflow
+
 ## Configuration
 
 - `github_token` - Required.  The access token used to push changes to the branch on GitHub.
@@ -43,6 +53,7 @@ Notes:
 - `workflow` - Optional, default: `push`.  Specifies the workflow that is run when metadata updates are found:
   1. `push`
   1. `branch`
+  1. `push_for_bots`
 - `cleanup_on_success` - Optional, default: `'false'`.  Only applies to the `branch` workflow.  Set to the string `'true'` to close PRs and delete branches used by the `branch` workflow when `licensed status` succeeds on the parent branch.
 - `dependabot_skip` - Optional, default: `'false'`.  Set to the string `'true'` to prepend `[dependabot skip]` to commit messages when licensed-ci is run on a Pull Request or commit authored by Dependabot.  This will signal to Dependabot that it is safe to perform its normal operations even though non-Dependabot commits are present on the Dependabot Pull Request.
 

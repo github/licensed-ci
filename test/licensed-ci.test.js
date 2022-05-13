@@ -33,7 +33,7 @@ describe('licensed-ci', () => {
     await run();
     expect(core.setFailed.callCount).toEqual(1);
     expect(core.setFailed.getCall(0).args).toEqual([
-      'Workflow input value "invalid" must be one of: branch, push'
+      'Workflow input value "invalid" must be one of: branch, push, push_for_bots'
     ]);
   });
 

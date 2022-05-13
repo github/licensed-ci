@@ -483,7 +483,7 @@ async function run() {
   throw new Error('Cached metadata checks failed');
 }
 
-module.exports = run;
+module.exports = { run };
 
 
 /***/ }),
@@ -491,8 +491,15 @@ module.exports = run;
 /***/ 6510:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-module.exports.branch = __nccwpck_require__(7939);
-module.exports.push = __nccwpck_require__(8718);
+const { run: branch } = __nccwpck_require__(7939);
+const { run: push } = __nccwpck_require__(8718);
+const { run: push_for_bots } = __nccwpck_require__(4478);
+
+module.exports = {
+  branch,
+  push,
+  push_for_bots
+};
 
 
 /***/ }),
@@ -584,7 +591,57 @@ async function run() {
   });
 }
 
-module.exports = run;
+module.exports = { run };
+
+
+/***/ }),
+
+/***/ 4478:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const core = __nccwpck_require__(2186);
+const exec = __nccwpck_require__(1514);
+const { Context } = __nccwpck_require__(4087);
+const utils = __nccwpck_require__(918);
+const branch = __nccwpck_require__(7939);
+const push = __nccwpck_require__(8718);
+
+async function hasLicensesBranch(context) {
+  const branch = utils.getBranch(context);
+  if (branch.endsWith('-licenses')) {
+    return true;
+  }
+
+  // check that the license branch exists
+  const exitCode = await exec.exec('git', 
+    ['ls-remote', '--exit-code', '.', `${utils.getOrigin()}/${branch}-licenses`], 
+    { ignoreReturnCode: true});
+  return exitCode === 0;
+}
+
+function isBotSender(context) {
+  return context.payload.sender && context.payload.sender.type === 'Bot';
+}
+
+async function run() {
+  const context = new Context();
+
+  // run the branch workflow when
+  // 1. the branch workflow has already run and there is a separate licenese branch
+  // 2. the action was triggered from a "User" typed user
+  if ((await hasLicensesBranch(context))) {
+    core.info('Detected licenses branch, choosing branch workflow');
+    await branch.run();
+  } else if (!isBotSender(context)) {
+    core.info('Detected user context, choosing branch workflow');
+    await branch.run();
+  } else {
+    core.info('Detected no licenses branch and Bot context, choosing push workflow');
+    await push.run();
+  }
+}
+
+module.exports = { run };
 
 
 /***/ }),
