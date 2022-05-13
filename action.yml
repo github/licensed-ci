@@ -39,6 +39,10 @@ inputs:
   branch:
     description: 'Branch to run the action on when using `workflow_dispatch` or `schedule` event triggers'
     required: false
+  dependabot_skip: 
+    description: 'Whether to add [dependabot skip] to license update commits resulting from Dependabot updates'
+    required: false
+    default: 'false'
 outputs:
   licenses_branch:
     description: The branch containing licensed-ci changes.
