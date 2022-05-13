@@ -128,7 +128,52 @@ describe('userConfig', () => {
   it('returns inline git configuration for user from action input', () => {
     expect(utils.userConfig()).toEqual(['-c', 'user.name=user', '-c', 'user.email=email'])
   });
-})
+});
+
+describe('isDependabotContext', () => {
+  it('returns false', () => {
+    expect(utils.isDependabotContext({payload: {}})).toEqual(false);
+  });
+
+  it('returns true if pull_request.user.login is "dependabot[bot]"', () => {
+    const context = {
+      payload: {
+        pull_request: {
+          user: {
+            login: 'dependabot[bot]'
+          }
+        }
+      }
+    };
+    expect(utils.isDependabotContext(context)).toEqual(true);
+  });
+
+  it('returns true if actor is "dependabot[bot]"', () => {
+    const context = {payload: {}, actor: 'dependabot[bot]'};
+    expect(utils.isDependabotContext(context)).toEqual(true);
+  });
+});
+
+describe('getCommitMessage', () => {
+  beforeEach(() => {
+    process.env.INPUT_COMMIT_MESSAGE = 'Commit message';
+    process.env.INPUT_DEPENDABOT_SKIP = 'false';
+  });
+
+  afterEach(() => {
+    process.env = processEnv;
+  })
+
+  it('returns the commit message input', () => {
+    expect(utils.getCommitMessage({})).toEqual('Commit message');
+  });
+
+  it('prepends [dependabot skip] when dependabot_skip input is true and the action is run in a dependabot context', () => {
+    process.env.INPUT_DEPENDABOT_SKIP = 'true';
+    const context = {actor: 'dependabot[bot]', payload: {}}
+    expect(utils.getCommitMessage(context)).toEqual('[dependabot skip] Commit message');
+  })
+});
 
 describe('getLicensedInput', () => {
   const command = 'licensed';

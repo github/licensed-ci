@@ -86,6 +86,20 @@ function userConfig() {
   ]
 }
 
+function isDependabotContext(context) {
+  return (context.payload.pull_request && context.payload.pull_request.user.login === 'dependabot[bot]') ||
+         context.actor === 'dependabot[bot]';
+}
+
+function getCommitMessage(context) {
+  let commitMessage = core.getInput('commit_message', { required: true });
+  if (core.getBooleanInput('dependabot_skip', { required: false }) && isDependabotContext(context)) {
+    commitMessage = `[dependabot skip] ${commitMessage}`;
+  }
+
+  return commitMessage;
+}
+
 async function getLicensedInput() {
   const command = core.getInput('command', { required: true });
   await io.which(command.split(' ')[0], true); // check that command is runnable
@@ -227,6 +241,8 @@ module.exports = {
   configureGit,
   extraHeaderConfigWithoutAuthorization,
   userConfig,
+  isDependabotContext,
+  getCommitMessage,
   getLicensedInput,
   getBranch,
   getCachePaths,
@@ -431,8 +447,7 @@ async function run() {
     exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths], { ignoreReturnCode: true });
     if (exitCode > 0) {
       // if files were changed, push them back up to origin using the passed in github token
-      const commitMessage = core.getInput('commit_message', { required: true });
-      await exec.exec('git', [...utils.userConfig(), 'commit', '-m', commitMessage]);
+      await exec.exec('git', [...utils.userConfig(), 'commit', '-m', utils.getCommitMessage()]);
 
       const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
       await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), `${localLicensesBranch}:${licensesBranch}`]);
@@ -547,9 +562,7 @@ async function run() {
     const exitCode = await exec.exec('git', ['diff-index', '--quiet', 'HEAD', '--', ...cachePaths], { ignoreReturnCode: true });
     if (exitCode > 0) {
       // if files were changed, push them back up to origin using the passed in github token
-      const commitMessage = core.getInput('commit_message', { required: true });
-      const userConfig = utils.userConfig();
-      await exec.exec('git', [...userConfig, 'commit', '-m', commitMessage]);
+      await exec.exec('git', [...utils.userConfig(), 'commit', '-m', utils.getCommitMessage()]);
 
       const extraHeadersConfig = await utils.extraHeaderConfigWithoutAuthorization();
       await exec.exec('git', [...extraHeadersConfig, 'push', utils.getOrigin(), `${localBranch}:${branch}`]);

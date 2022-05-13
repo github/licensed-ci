@@ -27,7 +27,6 @@ describe('push workflow', () => {
   let createCommentEndpoint;
 
   beforeEach(() => {
-    process.env.INPUT_COMMIT_MESSAGE = commitMessage;
     process.env.INPUT_CONFIG_FILE = configFilePath;
     process.env.INPUT_GITHUB_TOKEN = token;
     process.env.GITHUB_REPOSITORY = `${owner}/${repo}`;
@@ -54,7 +53,8 @@ describe('push workflow', () => {
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
     sinon.stub(utils, 'filterCachePaths').resolves(cachePaths);
-    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([])
+    sinon.stub(utils, 'extraHeaderConfigWithoutAuthorization').resolves([]);
+    sinon.stub(utils, 'getCommitMessage').returns(commitMessage);
     sinon.stub(github, 'getOctokit').returns(octokit);
     sinon.stub(exec, 'exec')
       .rejects()
