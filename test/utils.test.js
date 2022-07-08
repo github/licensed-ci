@@ -408,7 +408,7 @@ describe('ensureBranch', () => {
     ]);
   });
 
-  it('checks out a branch with unshallow if .git/shallow file exists', async () => {
+  it('checks out a branch with unshallow if .git/shallow file exists and argument is true', async () => {
     fs.existsSync.withArgs('.git/shallow').returns(true);
     sinon.stub(exec, 'exec').resolves(0);
 
@@ -417,6 +417,19 @@ describe('ensureBranch', () => {
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
       ['fetch', '--unshallow', utils.getOrigin(), branch],
+      { ignoreReturnCode: true }
+    ]);
+  });
+
+  it('does not check out a branch with unshallow if .git/shallow file exists and argument is false', async () => {
+    fs.existsSync.withArgs('.git/shallow').returns(true);
+    sinon.stub(exec, 'exec').resolves(0);
+
+    await utils.ensureBranch(branch, branch, false);
+    expect(exec.exec.callCount).toEqual(2);
+    expect(exec.exec.getCall(0).args).toEqual([
+      'git',
+      ['fetch', utils.getOrigin(), branch],
       { ignoreReturnCode: true }
     ]);
   });

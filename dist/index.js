@@ -231,13 +231,13 @@ async function filterCachePaths(paths) {
   return filteredPaths.filter(p=>p);
 }
 
-async function ensureBranch(branch, parent) {
+async function ensureBranch(branch, parent, unshallow = true) {
   const localBranch = `${ORIGIN}/${branch}`;
   const localParent = `${ORIGIN}/${parent}`;
 
   // always fetch the work and licenses branches
   const fetchOpts = [];
-  if (fs.existsSync('.git/shallow')) {
+  if (unshallow && fs.existsSync('.git/shallow')) {
     fetchOpts.push('--unshallow');
   }
 
@@ -601,7 +601,7 @@ async function run() {
     return;
   }
 
-  const [localBranch] = await utils.ensureBranch(branch, branch);
+  const [localBranch] = await utils.ensureBranch(branch, branch, false);
 
   // find an open pull request for the changes if one exists
   const token = core.getInput('github_token', { required: true });

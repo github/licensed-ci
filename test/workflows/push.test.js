@@ -102,7 +102,7 @@ describe('push workflow', () => {
     expect(utils.checkStatus.getCall(1).args).toEqual([command, cliOptions]);
 
     expect(utils.ensureBranch.callCount).toEqual(1);
-    expect(utils.ensureBranch.getCall(0).args).toEqual([branch, branch]);
+    expect(utils.ensureBranch.getCall(0).args).toEqual([branch, branch, false]);
 
     expect(utils.findPullRequest.callCount).toEqual(1);
     expect(utils.findPullRequest.getCall(0).args).toEqual([octokit, { head: branch }]);
