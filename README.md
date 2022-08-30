@@ -104,8 +104,8 @@ jobs:
     env: # optionally configure the Gemfile used
       BUNDLE_GEMFILE: ${{ github.workspace }}/licensed.gemfile
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-ruby@v1
+      - uses: actions/checkout@v3
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 2.6
           bundler-cache: true # improve performance on subsequent runs
@@ -123,7 +123,7 @@ jobs:
 jobs:
   licensed:
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: jonabc/setup-licensed@v1
         with:
           version: 3.x
@@ -198,13 +198,13 @@ permissions:
 jobs:
   licensed:
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-ruby@v1
+      - uses: actions/checkout@v3
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: 2.6
           bundler-cache: true # improve performance on subsequent runs
           cache-version: 1
-      - uses: actions/setup-node@v2
+      - uses: actions/setup-node@v3
         with:
           node-version: 16
           cache: npm # cache dependencies for faster subsequent runs.
