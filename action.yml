@@ -43,6 +43,13 @@ inputs:
     description: 'Whether to add [dependabot skip] to license update commits resulting from Dependabot updates'
     required: false
     default: 'false'
+  sources:
+    description: 'Set to a string containing a comma-separated list of github/licensed source name to add `--sources` CLI arguments to cache and status commands.'
+    required: false
+  format:
+    description: 'Set to `yaml` or `json` to add the `--format` CLI argument to cache and status commands.'
+    required: false 
+
 outputs:
   licenses_branch:
     description: The branch containing licensed-ci changes.

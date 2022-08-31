@@ -4,6 +4,7 @@ const github = require('@actions/github');
 const path = require('path');
 const sinon = require('sinon');
 const utils = require('../../lib/utils');
+const { CLIOptions } = require('../../lib/cli-options');
 const { run: workflow } = require('../../lib/workflows/branch');
 
 const processEnv = process.env;
@@ -13,6 +14,7 @@ describe('branch workflow', () => {
   const commitMessage = 'commit message';
   const command = 'licensed';
   const configFilePath = path.normalize(path.join(__dirname, '..', '..', '.licensed.yml'));
+  const cliOptions = new CLIOptions(configFilePath, ['npm'], 'json');
   const cachePaths = ['cache1', 'cache2'];
 
   const branch = 'branch';
@@ -59,7 +61,7 @@ describe('branch workflow', () => {
 
     sinon.stub(utils, 'userConfig').returns(userConfig)
     sinon.stub(utils, 'getBranch').returns(branch);
-    sinon.stub(utils, 'getLicensedInput').resolves({ command, configFilePath });
+    sinon.stub(utils, 'getLicensedInput').resolves({ command, options: cliOptions });
     sinon.stub(utils, 'ensureBranch').resolves([localLicensesBranch, localBranch]);
     sinon.stub(utils, 'findPullRequest').resolves(null);
     sinon.stub(utils, 'getCachePaths').resolves(cachePaths);
@@ -89,7 +91,7 @@ describe('branch workflow', () => {
 
     await workflow();
     expect(utils.checkStatus.callCount).toEqual(1);
-    expect(utils.checkStatus.getCall(0).args).toEqual([command, configFilePath]);
+    expect(utils.checkStatus.getCall(0).args).toEqual([command, cliOptions]);
     expect(exec.exec.callCount).toEqual(0);
   });
 
@@ -101,7 +103,7 @@ describe('branch workflow', () => {
     expect(utils.getLicensedInput.callCount).toEqual(1);
 
     expect(utils.checkStatus.callCount).toEqual(1);
-    expect(utils.checkStatus.getCall(0).args).toEqual([command, configFilePath]);
+    expect(utils.checkStatus.getCall(0).args).toEqual([command, cliOptions]);
 
     expect(utils.ensureBranch.callCount).toEqual(1);
     expect(utils.ensureBranch.getCall(0).args).toEqual([licensesBranch, branch]);
@@ -115,10 +117,10 @@ describe('branch workflow', () => {
       [...userConfig, 'merge', '-s', 'recursive', '-Xtheirs', localBranch],
       { ignoreReturnCode: true }
     ]);
-    expect(exec.exec.getCall(1).args).toEqual([command, ['cache', '-c', configFilePath]]);
+    expect(exec.exec.getCall(1).args).toEqual([command, ['cache', ...cliOptions.cacheOptions]]);
 
     expect(utils.getCachePaths.callCount).toEqual(1);
-    expect(utils.getCachePaths.getCall(0).args).toEqual([command, configFilePath]);
+    expect(utils.getCachePaths.getCall(0).args).toEqual([command, cliOptions]);
 
     expect(utils.filterCachePaths.callCount).toEqual(1);
     expect(utils.filterCachePaths.getCall(0).args).toEqual([cachePaths]);

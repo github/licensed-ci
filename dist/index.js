@@ -1,6 +1,51 @@
 /******/ (() => { // webpackBootstrap
 /******/ 	var __webpack_modules__ = ({
 
+/***/ 2256:
+/***/ ((module) => {
+
+class CLIOptions {
+  configFilePath = '';
+  sources = [];
+  format = '';
+
+  constructor(configFilePath, sources=[], format='') {
+    this.configFilePath = configFilePath;
+    this.sources = sources;
+    this.format = format;
+  }
+
+  get cacheOptions() {
+    const options = ['-c', this.configFilePath];
+    if (this.sources) {
+      options.push(...this.sources.flatMap(s => ['--sources', s]));
+    }
+    if (this.format) {
+      options.push('--format', this.format)
+    }
+
+    return options;
+  }
+
+  get statusOptions() {
+    return this.cacheOptions;
+  }
+
+  get envOptions() {
+    const options = ['-c', this.configFilePath];
+    if (this.format) {
+      options.push('--format', this.format)
+    }
+
+    return options;
+  }
+}
+
+module.exports = { CLIOptions };
+
+
+/***/ }),
+
 /***/ 1088:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -38,6 +83,7 @@ const fs = __nccwpck_require__(7147);
 const github = __nccwpck_require__(5438);
 const io = __nccwpck_require__(7436);
 const stream = __nccwpck_require__(2781);
+const { CLIOptions } = __nccwpck_require__(2256)
 
 const ORIGIN = 'licensed-ci-origin';
 
@@ -107,10 +153,21 @@ async function getLicensedInput() {
   const configFilePath = core.getInput('config_file', { required: true });
   await fs.promises.access(configFilePath); // check that config file exists
 
-  return { command, configFilePath };
+  const sources = [];
+  const sourcesInput = core.getInput('sources', { required: false });
+  if (sourcesInput) {
+    sources.push(...sourcesInput.split(',').map(s => s.trim()).filter(s => s));
+  }
+
+  const format = core.getInput('format', { required: false });
+  
+  return {
+    command,
+    options: new CLIOptions(configFilePath, sources, format)
+  };
 }
 
-async function checkStatus(command, configFilePath) {
+async function checkStatus(command, cliOptions) {
   let log = '';
   const options = {
     ignoreReturnCode: true,
@@ -118,7 +175,7 @@ async function checkStatus(command, configFilePath) {
       stdout: data => log += data.toString()
     }
   };
-  const exitCode = await exec.exec(command, ['status', '-c', configFilePath], options);
+  const exitCode = await exec.exec(command, ['status', ...cliOptions.statusOptions], options);
   return { success: exitCode === 0, log };
 }
 
@@ -144,7 +201,7 @@ function getBranch(context) {
   throw new Error(`Unable to determine a HEAD branch reference for ${context.eventName} event type`);
 }
 
-async function getCachePaths(command, configFilePath) {
+async function getCachePaths(command, cliOptions) {
   let output = '';
   const options = {
     ignoreReturnCode: true,
@@ -154,7 +211,8 @@ async function getCachePaths(command, configFilePath) {
     outStream: new stream.Writable({ write: () => {} })
   };
 
-  const exitCode = await exec.exec(command, ['env', '--format', 'json', '-c', configFilePath], options);
+  const optionsWithJSONFormat = new CLIOptions(cliOptions.configFilePath, cliOptions.sources, 'json');
+  const exitCode = await exec.exec(command, ['env', ...optionsWithJSONFormat.envOptions], options);
   if (exitCode === 0 && output) {
     return JSON.parse(output).apps.map(app => app.cache_path);
   }
@@ -173,13 +231,13 @@ async function filterCachePaths(paths) {
   return filteredPaths.filter(p=>p);
 }
 
-async function ensureBranch(branch, parent) {
+async function ensureBranch(branch, parent, unshallow = true) {
   const localBranch = `${ORIGIN}/${branch}`;
   const localParent = `${ORIGIN}/${parent}`;
 
   // always fetch the work and licenses branches
   const fetchOpts = [];
-  if (fs.existsSync('.git/shallow')) {
+  if (unshallow && fs.existsSync('.git/shallow')) {
     fetchOpts.push('--unshallow');
   }
 
@@ -409,10 +467,10 @@ async function run() {
   const octokit = github.getOctokit(token);
   let licensesPullRequest = await utils.findPullRequest(octokit, { head: licensesBranch, base: userBranch });
 
-  const { command, configFilePath } = await utils.getLicensedInput();
+  const { command, options } = await utils.getLicensedInput();
 
   // check whether cached metadata needs any updating
-  let statusResult = await utils.checkStatus(command, configFilePath);
+  let statusResult = await utils.checkStatus(command, options);
   if (statusResult.success) {
     if (branch !== licensesBranch && core.getInput('cleanup_on_success', { required: true }) === 'true') {
       // delete the licenses branch if it exists
@@ -437,10 +495,10 @@ async function run() {
     }
 
     // cache any metadata updates
-    await exec.exec(command, ['cache', '-c', configFilePath]);
+    await exec.exec(command, ['cache', ...options.cacheOptions]);
 
     // stage any changes, checking only configured cache paths if possible
-    const cachePaths = await utils.getCachePaths(command, configFilePath);
+    const cachePaths = await utils.getCachePaths(command, options);
     await exec.exec('git', ['add', '--', ...(await utils.filterCachePaths(cachePaths))]);
 
     // check for any changes, checking only configured cache paths if possible
@@ -459,7 +517,7 @@ async function run() {
         pullRequestCreated = true;
       }
 
-      statusResult = await utils.checkStatus(command, configFilePath);
+      statusResult = await utils.checkStatus(command, options);
       await notifyStatus(octokit, userBranch, userPullRequest, licensesPullRequest, statusResult);
 
       if (userPullRequest) {
@@ -533,17 +591,17 @@ async function run() {
   core.setOutput('licenses_branch', branch);
   core.setOutput('user_branch', branch);
 
-  const { command, configFilePath } = await utils.getLicensedInput();
+  const { command, options } = await utils.getLicensedInput();
 
   // pre-check, if status succeeds no need to re-cache
   let statusResult = await core.group('Pre-Checking license status', async () => {
-    return utils.checkStatus(command, configFilePath);
+    return utils.checkStatus(command, options);
   });
   if (statusResult.success) {
     return;
   }
 
-  const [localBranch] = await utils.ensureBranch(branch, branch);
+  const [localBranch] = await utils.ensureBranch(branch, branch, false);
 
   // find an open pull request for the changes if one exists
   const token = core.getInput('github_token', { required: true });
@@ -552,10 +610,10 @@ async function run() {
 
   // cache any metadata updates
   await core.group('Refreshing cache', async () => {
-    await exec.exec(command, ['cache', '-c', configFilePath]);
+    await exec.exec(command, ['cache', ...options.cacheOptions]);
 
     // stage any changes, checking only configured cache paths if possible
-    const cachePaths = await utils.getCachePaths(command, configFilePath);
+    const cachePaths = await utils.getCachePaths(command, options);
     await exec.exec('git', ['add', '--', ...(await utils.filterCachePaths(cachePaths))]);
 
     // check for any changes, checking only configured cache paths if possible
@@ -584,7 +642,7 @@ async function run() {
 
   // after re-caching, check status
   await core.group('Check license status', async () => {
-    statusResult = await utils.checkStatus(command, configFilePath);
+    statusResult = await utils.checkStatus(command, options);
     if (!statusResult.success) {
       throw new Error('Cached metadata checks failed');
     }
@@ -1070,6 +1128,13 @@ Object.defineProperty(exports, "summary", ({ enumerable: true, get: function () 
  */
 var summary_2 = __nccwpck_require__(1327);
 Object.defineProperty(exports, "markdownSummary", ({ enumerable: true, get: function () { return summary_2.markdownSummary; } }));
+/**
+ * Path exports
+ */
+var path_utils_1 = __nccwpck_require__(2981);
+Object.defineProperty(exports, "toPosixPath", ({ enumerable: true, get: function () { return path_utils_1.toPosixPath; } }));
+Object.defineProperty(exports, "toWin32Path", ({ enumerable: true, get: function () { return path_utils_1.toWin32Path; } }));
+Object.defineProperty(exports, "toPlatformPath", ({ enumerable: true, get: function () { return path_utils_1.toPlatformPath; } }));
 //# sourceMappingURL=core.js.map
 
 /***/ }),
@@ -1204,6 +1269,71 @@ class OidcClient {
 }
 exports.OidcClient = OidcClient;
 //# sourceMappingURL=oidc-utils.js.map
+
+/***/ }),
+
+/***/ 2981:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.toPlatformPath = exports.toWin32Path = exports.toPosixPath = void 0;
+const path = __importStar(__nccwpck_require__(1017));
+/**
+ * toPosixPath converts the given path to the posix form. On Windows, \\ will be
+ * replaced with /.
+ *
+ * @param pth. Path to transform.
+ * @return string Posix path.
+ */
+function toPosixPath(pth) {
+    return pth.replace(/[\\]/g, '/');
+}
+exports.toPosixPath = toPosixPath;
+/**
+ * toWin32Path converts the given path to the win32 form. On Linux, / will be
+ * replaced with \\.
+ *
+ * @param pth. Path to transform.
+ * @return string Win32 path.
+ */
+function toWin32Path(pth) {
+    return pth.replace(/[/]/g, '\\');
+}
+exports.toWin32Path = toWin32Path;
+/**
+ * toPlatformPath converts the given path to a platform-specific path. It does
+ * this by replacing instances of / and \ with the platform-specific path
+ * separator.
+ *
+ * @param pth The path to platformize.
+ * @return string The platform-specific path.
+ */
+function toPlatformPath(pth) {
+    return pth.replace(/[/\\]/g, path.sep);
+}
+exports.toPlatformPath = toPlatformPath;
+//# sourceMappingURL=path-utils.js.map
 
 /***/ }),
 

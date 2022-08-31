@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const sinon = require('sinon');
 const utils = require('../lib/utils');
+const { CLIOptions } = require('../lib/cli-options');
 
 const processEnv = process.env;
 
@@ -178,10 +179,14 @@ describe('getCommitMessage', () => {
 describe('getLicensedInput', () => {
   const command = 'licensed';
   const configFile = path.normalize(path.join(__dirname, '..', '.licensed.yml'));
+  const sources = 'go, npm,bundler'
+  const format = 'json';
 
   beforeEach(() => {
     process.env.INPUT_COMMAND = command;
     process.env.INPUT_CONFIG_FILE = configFile;
+    process.env.INPUT_SOURCES = sources;
+    process.env.INPUT_FORMAT = format;
   });
 
   afterEach(() => {
@@ -221,9 +226,23 @@ describe('getLicensedInput', () => {
   });
 
   it('returns the input values for running licensed', async () => {
-    const { command, configFilePath } = await utils.getLicensedInput();
-    expect(command).toEqual(process.env.INPUT_COMMAND);
-    expect(configFilePath).toEqual(process.env.INPUT_CONFIG_FILE);
+    const { command, options } = await utils.getLicensedInput();
+    expect(command).toEqual(command);
+    expect(options).not.toBeNull;
+    expect(options.cacheOptions).toEqual([
+      '-c', configFile,
+      ...sources.split(',').flatMap(s=> ['--sources', s.trim()]),
+      '--format', format
+    ]);
+    expect(options.statusOptions).toEqual([
+      '-c', configFile,
+      ...sources.split(',').flatMap(s=> ['--sources', s.trim()]),
+      '--format', format
+    ]);
+    expect(options.envOptions).toEqual([
+      '-c', configFile,
+      '--format', format
+    ]);
   });
 });
 
@@ -238,7 +257,8 @@ describe('checkStatus', () => {
       return Promise.resolve(0);
     });
 
-    const { success, log } = await utils.checkStatus('test', '.licensed.test.yml');
+    const cliOptions = new CLIOptions('.licensed.test.yml');
+    const { success, log } = await utils.checkStatus('test', cliOptions);
     expect(success).toEqual(true);
     expect(log).toEqual('output to log');
     expect(exec.exec.callCount).toEqual(1);
@@ -297,7 +317,7 @@ describe('getBranch', () => {
 
 describe('getCachePaths', () => {
   const command = 'licensed';
-  const configFile = path.resolve(__dirname, '..', '.licensed.yml');
+  const cliOptions = new CLIOptions(path.resolve(__dirname, '..', '.licensed.yml'));
   const env = {
     apps: [
       { cache_path: 'project/licenses' },
@@ -319,11 +339,12 @@ describe('getCachePaths', () => {
   it('calls licensed env', async () => {
     exec.exec.resolves(1);
 
-    await utils.getCachePaths(command, configFile);
+    await utils.getCachePaths(command, cliOptions);
+    
     expect(exec.exec.callCount).toEqual(1);
     expect(exec.exec.getCall(0).args).toEqual(
       expect.arrayContaining(
-        ['licensed', ['env', '--format', 'json', '-c', configFile]]
+        ['licensed', ['env', ...(new CLIOptions(cliOptions.configFilePath, cliOptions.sources, 'json').envOptions)]]
       )
     );
   });
@@ -331,12 +352,12 @@ describe('getCachePaths', () => {
   it('returns default paths if licensed env is not available', async () => {
     exec.exec.resolves(1);
 
-    const cachePaths = await utils.getCachePaths(command, configFile);
+    const cachePaths = await utils.getCachePaths(command, cliOptions);
     expect(cachePaths).toEqual(['.']);
   });
 
   it('returns parsed cache paths from licensed env', async () => {
-    const cachePaths = await utils.getCachePaths(command, configFile);
+    const cachePaths = await utils.getCachePaths(command, cliOptions);
     expect(cachePaths).toEqual(['project/licenses', 'test/licenses']);
   });
 });
@@ -387,7 +408,7 @@ describe('ensureBranch', () => {
     ]);
   });
 
-  it('checks out a branch with unshallow if .git/shallow file exists', async () => {
+  it('checks out a branch with unshallow if .git/shallow file exists and argument is true', async () => {
     fs.existsSync.withArgs('.git/shallow').returns(true);
     sinon.stub(exec, 'exec').resolves(0);
 
@@ -396,6 +417,19 @@ describe('ensureBranch', () => {
     expect(exec.exec.getCall(0).args).toEqual([
       'git',
       ['fetch', '--unshallow', utils.getOrigin(), branch],
+      { ignoreReturnCode: true }
+    ]);
+  });
+
+  it('does not check out a branch with unshallow if .git/shallow file exists and argument is false', async () => {
+    fs.existsSync.withArgs('.git/shallow').returns(true);
+    sinon.stub(exec, 'exec').resolves(0);
+
+    await utils.ensureBranch(branch, branch, false);
+    expect(exec.exec.callCount).toEqual(2);
+    expect(exec.exec.getCall(0).args).toEqual([
+      'git',
+      ['fetch', utils.getOrigin(), branch],
       { ignoreReturnCode: true }
     ]);
   });

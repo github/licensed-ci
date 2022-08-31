@@ -56,6 +56,8 @@ The workflow that is run is chosen based on a few different checks:
   1. `push_for_bots`
 - `cleanup_on_success` - Optional, default: `'false'`.  Only applies to the `branch` workflow.  Set to the string `'true'` to close PRs and delete branches used by the `branch` workflow when `licensed status` succeeds on the parent branch.
 - `dependabot_skip` - Optional, default: `'false'`.  Set to the string `'true'` to prepend `[dependabot skip]` to commit messages when licensed-ci is run on a Pull Request or commit authored by Dependabot.  This will signal to Dependabot that it is safe to perform its normal operations even though non-Dependabot commits are present on the Dependabot Pull Request.
+- `sources` - Optional.  Set to a string containing a comma-separated list of [github/licensed sources](https://github.com/github/licensed/tree/master/docs/sources) to add `--sources` CLI arguments to cache and status commands.
+- `format` - Optional.  Available values: [`yaml`, `json`]. Set to add a `--format` CLI argument to cache and status commands.
 
 ## Outputs
 
