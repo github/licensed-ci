@@ -197,24 +197,22 @@ permissions:
 
 jobs:
   licensed:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: 2.6
-          bundler-cache: true # improve performance on subsequent runs
-          cache-version: 1
       - uses: actions/setup-node@v3
         with:
           node-version: 16
           cache: npm # cache dependencies for faster subsequent runs.
       # install your projects dependencies
       - run: npm install --production --ignore-scripts
+      - uses: jonabc/setup-licensed@v1
+        with:
+          version: 3.x
       - id: licensed
         uses: jonabc/licensed-ci@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          command: bundle exec licensed # or bin/licensed when using binstubs
       - uses: actions/github-script@0.2.0
         if: always() && steps.licensed.outputs.pr_number
         with:
