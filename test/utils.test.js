@@ -1,6 +1,7 @@
 const core = require('@actions/core');
 const exec = require('@actions/exec');
 const fs = require('fs');
+const nock = require('nock');
 const path = require('path');
 const sinon = require('sinon');
 const utils = require('../lib/utils');
@@ -632,5 +633,50 @@ describe('deleteBranch', () => {
       .withArgs('git', ['ls-remote', '--exit-code', utils.getOrigin(), branch]).resolves(0)
       .withArgs('git', ['push', utils.getOrigin(), '--delete', branch]).rejects();
     await expect(utils.deleteBranch(branch)).rejects.toThrow();
+  });
+});
+
+describe('newOctokit', () => {
+  beforeEach(() => {
+    process.env.INPUT_GITHUB_TOKEN = 'authtoken';
+    sinon.stub(core, 'info');
+  })
+
+  afterEach(() => {
+    sinon.restore();
+    process.env = processEnv;
+  });
+
+  it('returns an authenticated octokit instance', async () => {
+    let authenticated = false;
+    nock('https://api.github.com')
+      .get(/.*/)
+      .reply(200, function () {
+        const authHeaders = this.req.headers["authorization"];
+        authenticated = authHeaders.some(value => value.includes(process.env.INPUT_GITHUB_TOKEN));
+      });
+
+    const octokit = utils.newOctokit();
+    await octokit.rest.repos.get({ owner: 'jonabc', repo: 'licensed-ci' });
+    expect(authenticated).toEqual(true);
+  });
+
+  it('returns an octokit instance with rate limit handling', async () => {
+    const nockScope = nock('https://api.github.com')
+      .get(/.*/)
+      .reply(403, 'rate limited', { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1" })
+      .get(/.*/)
+      .reply(200, { owner: 'jonabc', repo: 'licensed-ci' });
+
+    
+    const octokit = utils.newOctokit();
+    const response = await octokit.rest.repos.get({ owner: 'jonabc', repo: 'licensed-ci' });
+    expect(response.status).toEqual(200);
+    expect(response.data).toEqual({ owner: 'jonabc', repo: 'licensed-ci' });
+
+    expect(nockScope.isDone()).toEqual(true);
+
+    expect(core.info.callCount).toEqual(1);
+    expect(core.info.getCall(0).args).toEqual(['Request attempt 1 was rate limited, retrying after 0 seconds']);
   });
 });
