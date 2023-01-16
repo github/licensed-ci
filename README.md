@@ -107,7 +107,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: 2.6
+          ruby-version: 3.1
           bundler-cache: true # improve performance on subsequent runs
           cache-version: 1
       - run: xxx # Install project dependencies here.
@@ -124,9 +124,17 @@ jobs:
   licensed:
     steps:
       - uses: actions/checkout@v3
+      
+      # install licensed.  licensed v4 can only be installed as a gem and requires
+      # running ruby/setup-ruby before jonabc/setup-licensed.  If a project doesn't
+      # require a specific version of ruby, default to installing latest stable
+      - uses: ruby/setup-ruby
+        with:
+          ruby-version: ruby
       - uses: jonabc/setup-licensed@v1
         with:
-          version: 3.x
+          version: 4.x
+
       - run: xxx # Install project dependencies here.
       - uses: jonabc/licensed-ci@v1
         with:
@@ -200,15 +208,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      # install environment pre-requisites and project dependencies
       - uses: actions/setup-node@v3
         with:
           node-version: 16
           cache: npm # cache dependencies for faster subsequent runs.
-      # install your projects dependencies
       - run: npm install --production --ignore-scripts
+
+      # install licensed.  licensed v4 can only be installed as a gem and requires
+      # running ruby/setup-ruby before jonabc/setup-licensed.  If a project doesn't
+      # require a specific version of ruby, default to installing latest stable
+      - uses: ruby/setup-ruby
+        with:
+          ruby-version: ruby
       - uses: jonabc/setup-licensed@v1
         with:
-          version: 3.x
+          version: 4.x
+
       - id: licensed
         uses: jonabc/licensed-ci@v1
         with:

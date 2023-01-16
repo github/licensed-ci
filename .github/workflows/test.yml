@@ -15,7 +15,13 @@ jobs:
         node-version: ${{ matrix.node }}
 
     - run: npm install
+
+    # install licensed
+    - uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ruby
     - uses: jonabc/setup-licensed@v1
       with:
-        version: '3.x'
+        version: '4.x'
+
     - run: npm run test
