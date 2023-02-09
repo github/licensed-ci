@@ -128,7 +128,7 @@ jobs:
       # install licensed.  licensed v4 can only be installed as a gem and requires
       # running ruby/setup-ruby before jonabc/setup-licensed.  If a project doesn't
       # require a specific version of ruby, default to installing latest stable
-      - uses: ruby/setup-ruby
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ruby
       - uses: jonabc/setup-licensed@v1
@@ -219,7 +219,7 @@ jobs:
       # install licensed.  licensed v4 can only be installed as a gem and requires
       # running ruby/setup-ruby before jonabc/setup-licensed.  If a project doesn't
       # require a specific version of ruby, default to installing latest stable
-      - uses: ruby/setup-ruby
+      - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ruby
       - uses: jonabc/setup-licensed@v1
