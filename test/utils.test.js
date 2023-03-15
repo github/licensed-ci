@@ -302,6 +302,12 @@ describe('getBranch', () => {
     expect(utils.getBranch(context)).toEqual('branch');
   });
 
+  it('returns a head ref from a merge group payload', () => {
+    const context = { payload: { ref: 'refs/heads/branch', merge_group: { head_ref: 'branch' }}};
+    
+    expect(utils.getBranch(context)).toEqual('branch');
+  });
+
   it('returns a head branch name from context.ref if not otherwise available', () => {
     expect(utils.getBranch({ ref: 'refs/heads/branch' })).toEqual('branch');
 
