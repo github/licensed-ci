@@ -44,4 +44,5 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         config_file: .licensed.release.yml
-        workflow: branch
+        workflow: push_for_bots
+        dependabot_skip: 'true'
