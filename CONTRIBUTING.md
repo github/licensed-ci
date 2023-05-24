@@ -1,8 +1,8 @@
 ## Contributing
 
-[fork]: https://github.com/github/licensed-ci/fork
-[pr]: https://github.com/github/licensed-ci/compare
-[style]: https://github.com/github/licensed-ci/blob/main/.eslintrc.json
+[fork]: https://github.com/jonabc/licensed-ci/fork
+[pr]: https://github.com/jonabc/licensed-ci/compare
+[style]: https://github.com/jonabc/licensed-ci/blob/main/.eslintrc.json
 [code-of-conduct]: CODE_OF_CONDUCT.md
 
 Hi there! We're thrilled that you'd like to contribute to this project. Your help is essential for keeping it great.
