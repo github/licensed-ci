@@ -11,13 +11,6 @@ Contributions to this project are [released](https://help.github.com/articles/gi
 
 Please note that this project is released with a [Contributor Code of Conduct](CODE_OF_CONDUCT.md). By participating in this project you agree to abide by its terms.
 
-## Prerequisites for running and testing code
-
-These are one time installations required to be able to test your changes locally as part of the pull request (PR) submission process.
-
-1. install Go [through download](https://go.dev/doc/install) | [through Homebrew](https://formulae.brew.sh/formula/go)
-1. [install golangci-lint](https://golangci-lint.run/usage/install/#local-installation)
-
 ## Submitting a pull request
 
 1. [Fork][fork] and clone the repository
@@ -27,7 +20,7 @@ These are one time installations required to be able to test your changes locall
 1. Create a new branch: `git checkout -b my-branch-name`
 1. Make your change, add tests, and make sure the tests and linter still pass
 1. Push to your fork and [submit a pull request][pr]
-1. Pat your self on the back and wait for your pull request to be reviewed and merged.
+1. Pat yourself on the back and wait for your pull request to be reviewed and merged.
 
 Here are a few things you can do that will increase the likelihood of your pull request being accepted:
 
