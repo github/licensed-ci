@@ -256,4 +256,4 @@ You can expect the following support.  See [SUPPORT](SUPPORT.md) for more inform
 
 ## Contributions
 
-Contributions are welcome!
+Contributions are welcome!  See [CONTRIBUTING.md](./CONTRIBUTING.md) for more information on how to get involved.
