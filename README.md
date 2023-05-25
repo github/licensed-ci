@@ -2,10 +2,10 @@
 
 ![test](https://github.com/jonabc/licensed-ci/workflows/Test/badge.svg)
 
-Runs a [github/licensed](https://github.com/github/licensed) CI workflow.
+A GitHub Action to run [github/licensed](https://github.com/github/licensed) in a CI workflow.
 
 1. Run a workflow to update cached dependency metadata using `licensed cache` and push updates to GitHub
-1. Run `licensed status` to check that license data is available, known, up to date and valid for all dependencies
+2. Run `licensed status` to check that license data is available, known, up to date and valid for all dependencies
    - Status check failures will cause the step to fail, allowing examination and further updates to the code (if needed).
 
 ## Available Workflows
@@ -246,6 +246,11 @@ jobs:
 
 This project is released under the [MIT License](LICENSE)
 
+## Maintainers
+
+- @ajhenry
+- @lumaxis
+
 ## Support
 
 You can expect the following support.  See [SUPPORT](SUPPORT.md) for more information.
@@ -257,3 +262,7 @@ You can expect the following support.  See [SUPPORT](SUPPORT.md) for more inform
 ## Contributions
 
 Contributions are welcome!  See [CONTRIBUTING.md](./CONTRIBUTING.md) for more information on how to get involved.
+
+## Acknowledgement
+
+Huge thank you and appreciation to @jonabc for championing license compliance and maintaining licensed over the years.
