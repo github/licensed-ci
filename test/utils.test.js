@@ -12,7 +12,7 @@ const processEnv = process.env;
 describe('configureGit', () => {
   beforeEach(() => {
     process.env.INPUT_GITHUB_TOKEN = 'token';
-    process.env.GITHUB_REPOSITORY = 'jonabc/licensed-ci';
+    process.env.GITHUB_REPOSITORY = 'github/licensed-ci';
     sinon.stub(core, 'group').callsFake((_name, fn) => fn());
   })
 
@@ -517,7 +517,7 @@ describe('findPullRequest', () => {
   let endpoint;
 
   beforeEach(() => {
-    process.env.GITHUB_REPOSITORY = 'jonabc/licensed-ci';
+    process.env.GITHUB_REPOSITORY = 'github/licensed-ci';
     endpoint = sinon.stub().resolves({ data: searchResultFixture });
     octokit = {
       rest: {
@@ -663,7 +663,7 @@ describe('newOctokit', () => {
       });
 
     const octokit = utils.newOctokit();
-    await octokit.rest.repos.get({ owner: 'jonabc', repo: 'licensed-ci' });
+    await octokit.rest.repos.get({ owner: 'github', repo: 'licensed-ci' });
     expect(authenticated).toEqual(true);
   });
 
@@ -672,13 +672,13 @@ describe('newOctokit', () => {
       .get(/.*/)
       .reply(403, 'rate limited', { "x-ratelimit-remaining": "0", "x-ratelimit-reset": "1" })
       .get(/.*/)
-      .reply(200, { owner: 'jonabc', repo: 'licensed-ci' });
+      .reply(200, { owner: 'github', repo: 'licensed-ci' });
 
     
     const octokit = utils.newOctokit();
-    const response = await octokit.rest.repos.get({ owner: 'jonabc', repo: 'licensed-ci' });
+    const response = await octokit.rest.repos.get({ owner: 'github', repo: 'licensed-ci' });
     expect(response.status).toEqual(200);
-    expect(response.data).toEqual({ owner: 'jonabc', repo: 'licensed-ci' });
+    expect(response.data).toEqual({ owner: 'github', repo: 'licensed-ci' });
 
     expect(nockScope.isDone()).toEqual(true);
 

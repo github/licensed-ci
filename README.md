@@ -1,6 +1,6 @@
 # licensed-ci
 
-![test](https://github.com/jonabc/licensed-ci/workflows/Test/badge.svg)
+![test](https://github.com/github/licensed-ci/workflows/Test/badge.svg)
 
 A GitHub Action to run [github/licensed](https://github.com/github/licensed) in a CI workflow.
 
@@ -111,13 +111,13 @@ jobs:
           bundler-cache: true # improve performance on subsequent runs
           cache-version: 1
       - run: xxx # Install project dependencies here.
-      - uses: jonabc/licensed-ci@v1
+      - uses: github/licensed-ci@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           command: "bundle exec licensed" # or bin/licensed when using binstubs
 ```
 
-### Basic non-Ruby usage using [jonabc/setup-licensed](https://github.com/jonabc/setup-licensed)
+### Basic non-Ruby usage using [github/setup-licensed](https://github.com/github/setup-licensed)
 
 ```yaml
 jobs:
@@ -126,17 +126,17 @@ jobs:
       - uses: actions/checkout@v3
       
       # install licensed.  licensed v4 can only be installed as a gem and requires
-      # running ruby/setup-ruby before jonabc/setup-licensed.  If a project doesn't
+      # running ruby/setup-ruby before github/setup-licensed.  If a project doesn't
       # require a specific version of ruby, default to installing latest stable
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ruby
-      - uses: jonabc/setup-licensed@v1
+      - uses: github/setup-licensed@v1
         with:
           version: 4.x
 
       - run: xxx # Install project dependencies here.
-      - uses: jonabc/licensed-ci@v1
+      - uses: github/licensed-ci@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
 ```
@@ -149,7 +149,7 @@ jobs:
     steps:
       - # environment setup ...
       - id: licensed # save the id of the step to reference later
-        uses: jonabc/licensed-ci@v1
+        uses: github/licensed-ci@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/github-script@0.2.0
@@ -217,17 +217,17 @@ jobs:
       - run: npm install --production --ignore-scripts
 
       # install licensed.  licensed v4 can only be installed as a gem and requires
-      # running ruby/setup-ruby before jonabc/setup-licensed.  If a project doesn't
+      # running ruby/setup-ruby before github/setup-licensed.  If a project doesn't
       # require a specific version of ruby, default to installing latest stable
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: ruby
-      - uses: jonabc/setup-licensed@v1
+      - uses: github/setup-licensed@v1
         with:
           version: 4.x
 
       - id: licensed
-        uses: jonabc/licensed-ci@v1
+        uses: github/licensed-ci@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/github-script@0.2.0
