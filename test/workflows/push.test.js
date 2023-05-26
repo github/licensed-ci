@@ -21,7 +21,7 @@ describe('push workflow', () => {
   const localBranch = `${utils.getOrigin()}/${branch}`;
 
   // to match the response from the testSearchResult.json fixture
-  const owner = 'jonabc';
+  const owner = 'github';
   const repo = 'setup-licensed';
   const userConfig = ['-c', 'config=value'];
 

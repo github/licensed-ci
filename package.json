@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jonabc/licensed-ci.git"
+    "url": "git+https://github.com/github/licensed-ci.git"
   },
   "keywords": [
     "GitHub",
@@ -20,9 +20,9 @@
   "author": "Jon Ruskin",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/jonabc/licensed-ci/issues"
+    "url": "https://github.com/github/licensed-ci/issues"
   },
-  "homepage": "https://github.com/jonabc/licensed-ci#readme",
+  "homepage": "https://github.com/github/licensed-ci#readme",
   "dependencies": {
     "@actions/core": "^1.10.0",
     "@actions/exec": "^1.1.1",

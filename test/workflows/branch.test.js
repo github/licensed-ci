@@ -24,7 +24,7 @@ describe('branch workflow', () => {
 
   const pullRequest = require(path.normalize(path.join(__dirname, '..', 'fixtures', 'pullRequest.json')));
 
-  const owner = 'jonabc';
+  const owner = 'github';
   const repo = 'licensed-ci';
   const userConfig = ['-c', 'config=value'];
 
