@@ -257,7 +257,7 @@ You can expect the following support.  See [SUPPORT](SUPPORT.md) for more inform
 
 - bug fixes
 - review of feature request issues
-- review of questions in discussions (_Coming Soon_)
+- review of questions in [github/licensed Discussions](https://github.com/github/licensed/discussions)
 
 ## Contributions
 
