@@ -1,6 +1,6 @@
 ---
 name: "@octokit/plugin-throttling"
-version: 6.0.0
+version: 6.1.0
 type: npm
 summary: Octokit plugin for GitHub's recommended request throttling
 homepage: 
