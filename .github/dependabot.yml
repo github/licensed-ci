@@ -13,3 +13,18 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      dev-dependencies:
+        patterns:
+          - "@vercel/ncc"
+          - "eslint"
+          - "husky"
+          - "jest"
+          - "nock"
+          - "sinon"
+      actions-sdks:
+        patterns:
+          - "@actions/*"
+      octokit-sdks:
+        patterns:
+          - "@octokit/*"
