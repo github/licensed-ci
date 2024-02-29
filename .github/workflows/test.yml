@@ -9,7 +9,7 @@ jobs:
         node: [ 14.x, 16.x, 18.x ]
     steps:
     - uses: actions/checkout@v4
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@v4
       with:
         cache: npm 
         node-version: ${{ matrix.node }}
