@@ -4524,11 +4524,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 var _a;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getCmdPath = exports.tryGetExecutablePath = exports.isRooted = exports.isDirectory = exports.exists = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rename = exports.readlink = exports.readdir = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
+exports.getCmdPath = exports.tryGetExecutablePath = exports.isRooted = exports.isDirectory = exports.exists = exports.READONLY = exports.UV_FS_O_EXLOCK = exports.IS_WINDOWS = exports.unlink = exports.symlink = exports.stat = exports.rmdir = exports.rm = exports.rename = exports.readlink = exports.readdir = exports.open = exports.mkdir = exports.lstat = exports.copyFile = exports.chmod = void 0;
 const fs = __importStar(__nccwpck_require__(7147));
 const path = __importStar(__nccwpck_require__(1017));
-_a = fs.promises, exports.chmod = _a.chmod, exports.copyFile = _a.copyFile, exports.lstat = _a.lstat, exports.mkdir = _a.mkdir, exports.readdir = _a.readdir, exports.readlink = _a.readlink, exports.rename = _a.rename, exports.rmdir = _a.rmdir, exports.stat = _a.stat, exports.symlink = _a.symlink, exports.unlink = _a.unlink;
+_a = fs.promises
+// export const {open} = 'fs'
+, exports.chmod = _a.chmod, exports.copyFile = _a.copyFile, exports.lstat = _a.lstat, exports.mkdir = _a.mkdir, exports.open = _a.open, exports.readdir = _a.readdir, exports.readlink = _a.readlink, exports.rename = _a.rename, exports.rm = _a.rm, exports.rmdir = _a.rmdir, exports.stat = _a.stat, exports.symlink = _a.symlink, exports.unlink = _a.unlink;
+// export const {open} = 'fs'
 exports.IS_WINDOWS = process.platform === 'win32';
+// See https://github.com/nodejs/node/blob/d0153aee367422d0858105abec186da4dff0a0c5/deps/uv/include/uv/win.h#L691
+exports.UV_FS_O_EXLOCK = 0x10000000;
+exports.READONLY = fs.constants.O_RDONLY;
 function exists(fsPath) {
     return __awaiter(this, void 0, void 0, function* () {
         try {
@@ -4709,12 +4715,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.findInPath = exports.which = exports.mkdirP = exports.rmRF = exports.mv = exports.cp = void 0;
 const assert_1 = __nccwpck_require__(9491);
-const childProcess = __importStar(__nccwpck_require__(2081));
 const path = __importStar(__nccwpck_require__(1017));
-const util_1 = __nccwpck_require__(3837);
 const ioUtil = __importStar(__nccwpck_require__(1962));
-const exec = util_1.promisify(childProcess.exec);
-const execFile = util_1.promisify(childProcess.execFile);
 /**
  * Copies a file or folder.
  * Based off of shelljs - https://github.com/shelljs/shelljs/blob/9237f66c52e5daa40458f94f9565e18e8132f5a6/src/cp.js
@@ -4795,61 +4797,23 @@ exports.mv = mv;
 function rmRF(inputPath) {
     return __awaiter(this, void 0, void 0, function* () {
         if (ioUtil.IS_WINDOWS) {
-            // Node doesn't provide a delete operation, only an unlink function. This means that if the file is being used by another
-            // program (e.g. antivirus), it won't be deleted. To address this, we shell out the work to rd/del.
             // Check for invalid characters
             // https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
             if (/[*"<>|]/.test(inputPath)) {
                 throw new Error('File path must not contain `*`, `"`, `<`, `>` or `|` on Windows');
             }
-            try {
-                const cmdPath = ioUtil.getCmdPath();
-                if (yield ioUtil.isDirectory(inputPath, true)) {
-                    yield exec(`${cmdPath} /s /c "rd /s /q "%inputPath%""`, {
-                        env: { inputPath }
-                    });
-                }
-                else {
-                    yield exec(`${cmdPath} /s /c "del /f /a "%inputPath%""`, {
-                        env: { inputPath }
-                    });
-                }
-            }
-            catch (err) {
-                // if you try to delete a file that doesn't exist, desired result is achieved
-                // other errors are valid
-                if (err.code !== 'ENOENT')
-                    throw err;
-            }
-            // Shelling out fails to remove a symlink folder with missing source, this unlink catches that
-            try {
-                yield ioUtil.unlink(inputPath);
-            }
-            catch (err) {
-                // if you try to delete a file that doesn't exist, desired result is achieved
-                // other errors are valid
-                if (err.code !== 'ENOENT')
-                    throw err;
-            }
         }
-        else {
-            let isDir = false;
-            try {
-                isDir = yield ioUtil.isDirectory(inputPath);
-            }
-            catch (err) {
-                // if you try to delete a file that doesn't exist, desired result is achieved
-                // other errors are valid
-                if (err.code !== 'ENOENT')
-                    throw err;
-                return;
-            }
-            if (isDir) {
-                yield execFile(`rm`, [`-rf`, `${inputPath}`]);
-            }
-            else {
-                yield ioUtil.unlink(inputPath);
-            }
+        try {
+            // note if path does not exist, error is silent
+            yield ioUtil.rm(inputPath, {
+                force: true,
+                maxRetries: 3,
+                recursive: true,
+                retryDelay: 300
+            });
+        }
+        catch (err) {
+            throw new Error(`File was unable to be removed ${err}`);
         }
     });
 }
@@ -6280,62 +6244,78 @@ exports.restEndpointMethods = restEndpointMethods;
 /***/ }),
 
 /***/ 9968:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
 
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-Object.defineProperty(exports, "__esModule", ({ value: true }));
+// pkg/dist-src/index.js
+var dist_src_exports = {};
+__export(dist_src_exports, {
+  throttling: () => throttling
+});
+module.exports = __toCommonJS(dist_src_exports);
+var import_light = __toESM(__nccwpck_require__(1174));
 
-function _interopDefault (ex) { return (ex && (typeof ex === 'object') && 'default' in ex) ? ex['default'] : ex; }
+// pkg/dist-src/version.js
+var VERSION = "6.1.0";
 
-var BottleneckLight = _interopDefault(__nccwpck_require__(1174));
-
-const VERSION = "5.0.1";
-
-const noop = () => Promise.resolve();
-// @ts-expect-error
+// pkg/dist-src/wrap-request.js
+var noop = () => Promise.resolve();
 function wrapRequest(state, request, options) {
   return state.retryLimiter.schedule(doRequest, state, request, options);
 }
-// @ts-expect-error
 async function doRequest(state, request, options) {
   const isWrite = options.method !== "GET" && options.method !== "HEAD";
-  const {
-    pathname
-  } = new URL(options.url, "http://github.test");
+  const { pathname } = new URL(options.url, "http://github.test");
   const isSearch = options.method === "GET" && pathname.startsWith("/search/");
   const isGraphQL = pathname.startsWith("/graphql");
   const retryCount = ~~request.retryCount;
-  const jobOptions = retryCount > 0 ? {
-    priority: 0,
-    weight: 0
-  } : {};
+  const jobOptions = retryCount > 0 ? { priority: 0, weight: 0 } : {};
   if (state.clustering) {
-    // Remove a job from Redis if it has not completed or failed within 60s
-    // Examples: Node process terminated, client disconnected, etc.
-    // @ts-expect-error
-    jobOptions.expiration = 1000 * 60;
+    jobOptions.expiration = 1e3 * 60;
   }
-  // Guarantee at least 1000ms between writes
-  // GraphQL can also trigger writes
   if (isWrite || isGraphQL) {
     await state.write.key(state.id).schedule(jobOptions, noop);
   }
-  // Guarantee at least 3000ms between requests that trigger notifications
   if (isWrite && state.triggersNotification(pathname)) {
     await state.notifications.key(state.id).schedule(jobOptions, noop);
   }
-  // Guarantee at least 2000ms between search requests
   if (isSearch) {
     await state.search.key(state.id).schedule(jobOptions, noop);
   }
   const req = state.global.key(state.id).schedule(jobOptions, request, options);
   if (isGraphQL) {
     const res = await req;
-    if (res.data.errors != null &&
-    // @ts-expect-error
-    res.data.errors.some(error => error.type === "RATE_LIMITED")) {
+    if (res.data.errors != null && // @ts-expect-error
+    res.data.errors.some((error) => error.type === "RATE_LIMITED")) {
       const error = Object.assign(new Error("GraphQL Rate Limit Exceeded"), {
         response: res,
         data: res.data
@@ -6346,37 +6326,41 @@ async function doRequest(state, request, options) {
   return req;
 }
 
-var triggersNotificationPaths = ["/orgs/{org}/invitations", "/orgs/{org}/invitations/{invitation_id}", "/orgs/{org}/teams/{team_slug}/discussions", "/orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments", "/repos/{owner}/{repo}/collaborators/{username}", "/repos/{owner}/{repo}/commits/{commit_sha}/comments", "/repos/{owner}/{repo}/issues", "/repos/{owner}/{repo}/issues/{issue_number}/comments", "/repos/{owner}/{repo}/pulls", "/repos/{owner}/{repo}/pulls/{pull_number}/comments", "/repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies", "/repos/{owner}/{repo}/pulls/{pull_number}/merge", "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers", "/repos/{owner}/{repo}/pulls/{pull_number}/reviews", "/repos/{owner}/{repo}/releases", "/teams/{team_id}/discussions", "/teams/{team_id}/discussions/{discussion_number}/comments"];
+// pkg/dist-src/generated/triggers-notification-paths.js
+var triggers_notification_paths_default = [
+  "/orgs/{org}/invitations",
+  "/orgs/{org}/invitations/{invitation_id}",
+  "/orgs/{org}/teams/{team_slug}/discussions",
+  "/orgs/{org}/teams/{team_slug}/discussions/{discussion_number}/comments",
+  "/repos/{owner}/{repo}/collaborators/{username}",
+  "/repos/{owner}/{repo}/commits/{commit_sha}/comments",
+  "/repos/{owner}/{repo}/issues",
+  "/repos/{owner}/{repo}/issues/{issue_number}/comments",
+  "/repos/{owner}/{repo}/pulls",
+  "/repos/{owner}/{repo}/pulls/{pull_number}/comments",
+  "/repos/{owner}/{repo}/pulls/{pull_number}/comments/{comment_id}/replies",
+  "/repos/{owner}/{repo}/pulls/{pull_number}/merge",
+  "/repos/{owner}/{repo}/pulls/{pull_number}/requested_reviewers",
+  "/repos/{owner}/{repo}/pulls/{pull_number}/reviews",
+  "/repos/{owner}/{repo}/releases",
+  "/teams/{team_id}/discussions",
+  "/teams/{team_id}/discussions/{discussion_number}/comments"
+];
 
+// pkg/dist-src/route-matcher.js
 function routeMatcher(paths) {
-  // EXAMPLE. For the following paths:
-  /* [
-      "/orgs/{org}/invitations",
-      "/repos/{owner}/{repo}/collaborators/{username}"
-  ] */
-  const regexes = paths.map(path => path.split("/").map(c => c.startsWith("{") ? "(?:.+?)" : c).join("/"));
-  // 'regexes' would contain:
-  /* [
-      '/orgs/(?:.+?)/invitations',
-      '/repos/(?:.+?)/(?:.+?)/collaborators/(?:.+?)'
-  ] */
-  const regex = `^(?:${regexes.map(r => `(?:${r})`).join("|")})[^/]*$`;
-  // 'regex' would contain:
-  /*
-    ^(?:(?:\/orgs\/(?:.+?)\/invitations)|(?:\/repos\/(?:.+?)\/(?:.+?)\/collaborators\/(?:.+?)))[^\/]*$
-       It may look scary, but paste it into https://www.debuggex.com/
-    and it will make a lot more sense!
-  */
-  return new RegExp(regex, "i");
+  const regexes = paths.map(
+    (path) => path.split("/").map((c) => c.startsWith("{") ? "(?:.+?)" : c).join("/")
+  );
+  const regex2 = `^(?:${regexes.map((r) => `(?:${r})`).join("|")})[^/]*$`;
+  return new RegExp(regex2, "i");
 }
 
-// @ts-expect-error
-// Workaround to allow tests to directly access the triggersNotification function.
-const regex = routeMatcher(triggersNotificationPaths);
-const triggersNotification = regex.test.bind(regex);
-const groups = {};
-// @ts-expect-error
-const createGroups = function (Bottleneck, common) {
+// pkg/dist-src/index.js
+var regex = routeMatcher(triggers_notification_paths_default);
+var triggersNotification = regex.test.bind(regex);
+var groups = {};
+var createGroups = function(Bottleneck, common) {
   groups.global = new Bottleneck.Group({
     id: "octokit-global",
     maxConcurrent: 10,
@@ -6385,52 +6369,51 @@ const createGroups = function (Bottleneck, common) {
   groups.search = new Bottleneck.Group({
     id: "octokit-search",
     maxConcurrent: 1,
-    minTime: 2000,
+    minTime: 2e3,
     ...common
   });
   groups.write = new Bottleneck.Group({
     id: "octokit-write",
     maxConcurrent: 1,
-    minTime: 1000,
+    minTime: 1e3,
     ...common
   });
   groups.notifications = new Bottleneck.Group({
     id: "octokit-notifications",
     maxConcurrent: 1,
-    minTime: 3000,
+    minTime: 3e3,
     ...common
   });
 };
 function throttling(octokit, octokitOptions) {
   const {
     enabled = true,
-    Bottleneck = BottleneckLight,
+    Bottleneck = import_light.default,
     id = "no-id",
-    timeout = 1000 * 60 * 2,
+    timeout = 1e3 * 60 * 2,
     // Redis TTL: 2 minutes
     connection
   } = octokitOptions.throttle || {};
   if (!enabled) {
     return {};
   }
-  const common = {
-    connection,
-    timeout
-  };
+  const common = { connection, timeout };
   if (groups.global == null) {
     createGroups(Bottleneck, common);
   }
-  const state = Object.assign({
-    clustering: connection != null,
-    triggersNotification,
-    minimumSecondaryRateRetryAfter: 5,
-    retryAfterBaseValue: 1000,
-    retryLimiter: new Bottleneck(),
-    id,
-    ...groups
-  }, octokitOptions.throttle);
-  const isUsingDeprecatedOnAbuseLimitHandler = typeof state.onAbuseLimit === "function" && state.onAbuseLimit;
-  if (typeof (isUsingDeprecatedOnAbuseLimitHandler ? state.onAbuseLimit : state.onSecondaryRateLimit) !== "function" || typeof state.onRateLimit !== "function") {
+  const state = Object.assign(
+    {
+      clustering: connection != null,
+      triggersNotification,
+      fallbackSecondaryRateRetryAfter: 60,
+      retryAfterBaseValue: 1e3,
+      retryLimiter: new Bottleneck(),
+      id,
+      ...groups
+    },
+    octokitOptions.throttle
+  );
+  if (typeof state.onSecondaryRateLimit !== "function" || typeof state.onRateLimit !== "function") {
     throw new Error(`octokit/plugin-throttling error:
         You must pass the onSecondaryRateLimit and onRateLimit error handlers.
         See https://octokit.github.io/rest.js/#throttling
@@ -6445,63 +6428,56 @@ function throttling(octokit, octokitOptions) {
   }
   const events = {};
   const emitter = new Bottleneck.Events(events);
-  // @ts-expect-error
-  events.on("secondary-limit", isUsingDeprecatedOnAbuseLimitHandler ? function (...args) {
-    octokit.log.warn("[@octokit/plugin-throttling] `onAbuseLimit()` is deprecated and will be removed in a future release of `@octokit/plugin-throttling`, please use the `onSecondaryRateLimit` handler instead");
-    // @ts-expect-error
-    return state.onAbuseLimit(...args);
-  } : state.onSecondaryRateLimit);
-  // @ts-expect-error
+  events.on("secondary-limit", state.onSecondaryRateLimit);
   events.on("rate-limit", state.onRateLimit);
-  // @ts-expect-error
-  events.on("error", e => octokit.log.warn("Error in throttling-plugin limit handler", e));
-  // @ts-expect-error
-  state.retryLimiter.on("failed", async function (error, info) {
-    const [state, request, options] = info.args;
-    const {
-      pathname
-    } = new URL(options.url, "http://github.test");
+  events.on(
+    "error",
+    (e) => octokit.log.warn("Error in throttling-plugin limit handler", e)
+  );
+  state.retryLimiter.on("failed", async function(error, info) {
+    const [state2, request, options] = info.args;
+    const { pathname } = new URL(options.url, "http://github.test");
     const shouldRetryGraphQL = pathname.startsWith("/graphql") && error.status !== 401;
     if (!(shouldRetryGraphQL || error.status === 403)) {
       return;
     }
     const retryCount = ~~request.retryCount;
     request.retryCount = retryCount;
-    // backward compatibility
     options.request.retryCount = retryCount;
-    const {
-      wantRetry,
-      retryAfter = 0
-    } = await async function () {
+    const { wantRetry, retryAfter = 0 } = await async function() {
       if (/\bsecondary rate\b/i.test(error.message)) {
-        // The user has hit the secondary rate limit. (REST and GraphQL)
-        // https://docs.github.com/en/rest/overview/resources-in-the-rest-api#secondary-rate-limits
-        // The Retry-After header can sometimes be blank when hitting a secondary rate limit,
-        // but is always present after 2-3s, so make sure to set `retryAfter` to at least 5s by default.
-        const retryAfter = Math.max(~~error.response.headers["retry-after"], state.minimumSecondaryRateRetryAfter);
-        const wantRetry = await emitter.trigger("secondary-limit", retryAfter, options, octokit, retryCount);
-        return {
-          wantRetry,
-          retryAfter
-        };
+        const retryAfter2 = Number(error.response.headers["retry-after"]) || state2.fallbackSecondaryRateRetryAfter;
+        const wantRetry2 = await emitter.trigger(
+          "secondary-limit",
+          retryAfter2,
+          options,
+          octokit,
+          retryCount
+        );
+        return { wantRetry: wantRetry2, retryAfter: retryAfter2 };
       }
       if (error.response.headers != null && error.response.headers["x-ratelimit-remaining"] === "0") {
-        // The user has used all their allowed calls for the current time period (REST and GraphQL)
-        // https://docs.github.com/en/rest/reference/rate-limit (REST)
-        // https://docs.github.com/en/graphql/overview/resource-limitations#rate-limit (GraphQL)
-        const rateLimitReset = new Date(~~error.response.headers["x-ratelimit-reset"] * 1000).getTime();
-        const retryAfter = Math.max(Math.ceil((rateLimitReset - Date.now()) / 1000), 0);
-        const wantRetry = await emitter.trigger("rate-limit", retryAfter, options, octokit, retryCount);
-        return {
-          wantRetry,
-          retryAfter
-        };
+        const rateLimitReset = new Date(
+          ~~error.response.headers["x-ratelimit-reset"] * 1e3
+        ).getTime();
+        const retryAfter2 = Math.max(
+          Math.ceil((rateLimitReset - Date.now()) / 1e3),
+          0
+        );
+        const wantRetry2 = await emitter.trigger(
+          "rate-limit",
+          retryAfter2,
+          options,
+          octokit,
+          retryCount
+        );
+        return { wantRetry: wantRetry2, retryAfter: retryAfter2 };
       }
       return {};
     }();
     if (wantRetry) {
       request.retryCount++;
-      return retryAfter * state.retryAfterBaseValue;
+      return retryAfter * state2.retryAfterBaseValue;
     }
   });
   octokit.hook.wrap("request", wrapRequest.bind(null, state));
@@ -6509,9 +6485,8 @@ function throttling(octokit, octokitOptions) {
 }
 throttling.VERSION = VERSION;
 throttling.triggersNotification = triggersNotification;
-
-exports.throttling = throttling;
-//# sourceMappingURL=index.js.map
+// Annotate the CommonJS export names for ESM import in node:
+0 && (0);
 
 
 /***/ }),
