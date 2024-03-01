@@ -1,8 +1,8 @@
 ---
-name: "@octokit/endpoint"
-version: 7.0.3
+name: "@octokit/graphql"
+version: 8.0.1
 type: npm
-summary: Turns REST API endpoints into generic request options
+summary: GitHub GraphQL API client for browsers and Node
 homepage: 
 license: mit
 licenses:
