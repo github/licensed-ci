@@ -1,9 +1,8 @@
 ---
-name: "@octokit/request"
-version: 6.2.2
+name: "@octokit/endpoint"
+version: 10.0.0
 type: npm
-summary: Send parameterized requests to GitHub's APIs with sensible defaults in browsers
-  and Node
+summary: Turns REST API endpoints into generic request options
 homepage: 
 license: mit
 licenses:
