@@ -1,8 +1,8 @@
 ---
-name: "@octokit/core"
-version: 4.1.0
+name: "@octokit/auth-token"
+version: 5.1.1
 type: npm
-summary: Extendable client for GitHub's REST & GraphQL APIs
+summary: GitHub API token authentication for browsers and Node.js
 homepage: 
 license: mit
 licenses:
