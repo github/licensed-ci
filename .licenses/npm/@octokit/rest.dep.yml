@@ -1,8 +1,8 @@
 ---
-name: "@octokit/endpoint"
-version: 9.0.5
+name: "@octokit/rest"
+version: 21.0.1
 type: npm
-summary: Turns REST API endpoints into generic request options
+summary: GitHub REST API client for Node.js
 homepage: 
 license: mit
 licenses:
@@ -10,7 +10,8 @@ licenses:
   text: |
     The MIT License
 
-    Copyright (c) 2018 Octokit contributors
+    Copyright (c) 2012 Cloud9 IDE, Inc. (Mike de Boer)
+    Copyright (c) 2017-2018 Octokit contributors
 
     Permission is hereby granted, free of charge, to any person obtaining a copy
     of this software and associated documentation files (the "Software"), to deal
