@@ -1,8 +1,8 @@
 ---
-name: "@octokit/request-error"
-version: 2.1.0
+name: "@octokit/core"
+version: 5.2.0
 type: npm
-summary: Error class for Octokit request errors
+summary: Extendable client for GitHub's REST & GraphQL APIs
 homepage: 
 license: mit
 licenses:
