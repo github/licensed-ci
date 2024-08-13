@@ -268,6 +268,12 @@ async function filterCachePaths(paths) {
 }
 
 async function ensureBranch(branch, parent, unshallow = true) {
+  // Sanitize parent to ensure it cannot be used for command injection
+  // See https://github.com/github/licensed-ci/security/code-scanning/3
+  if (parent && parent.startsWith("--")) {
+    throw new Error(`Invalid parent name: ${parent}`);
+  }
+
   const localBranch = `${ORIGIN}/${branch}`;
   const localParent = `${ORIGIN}/${parent}`;
 
