@@ -95,7 +95,7 @@ const octokitThrottleOptions = {
     if (retryCount >= MAX_RETRY_COUNT) {
       core.error(`Request was not successful after ${MAX_RETRY_COUNT} attempts.  Failing`);
       return false;
-    } 
+    }
 
     core.info(`Request attempt ${retryCount + 1} was rate limited, retrying after ${retryAfter} seconds`);
     return true;
@@ -104,7 +104,7 @@ const octokitThrottleOptions = {
     if (retryCount >= MAX_RETRY_COUNT) {
       core.error(`Request was not successful after ${MAX_RETRY_COUNT} attempts.  Failing`);
       return false;
-    } 
+    }
 
     core.info(`Request attempt ${retryCount + 1} hit secondary rate limits, retrying after ${retryAfter} seconds`);
     return true;
@@ -194,7 +194,7 @@ async function getLicensedInput() {
   }
 
   const format = core.getInput('format', { required: false });
-  
+
   return {
     command,
     options: new CLIOptions(configFilePath, sources, format)
@@ -325,6 +325,11 @@ async function closePullRequest(octokit, pullRequest) {
 }
 
 async function deleteBranch(branch) {
+  // Address potential second-order command injection
+  // See https://github.com/github/licensed-ci/security/code-scanning/4
+  if (branch.startsWith("--")) {
+    throw new Error(`Invalid branch name: ${branch}`);
+  }
   const exitCode = await exec.exec('git', ['ls-remote', '--exit-code', ORIGIN, branch], { ignoreReturnCode: true });
   if (exitCode === 0) {
     await exec.exec('git', ['push', ORIGIN, '--delete', branch]);
