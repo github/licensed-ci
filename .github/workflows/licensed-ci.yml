@@ -24,7 +24,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    
+
     # setup node environment and packages
     - uses: actions/setup-node@v4
       with:
@@ -33,7 +33,7 @@ jobs:
     - run: npm install --production --ignore-scripts
 
     # install licensed
-    - uses: ruby/setup-ruby@v1
+    - uses: ruby/setup-ruby@a2bbe5b1b236842c1cb7dd11e8e3b51e0a616acc
       with:
         ruby-version: ruby
     - uses: github/setup-licensed@v1
