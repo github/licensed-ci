@@ -1,8 +1,8 @@
 ---
-name: "@octokit/plugin-throttling"
-version: 9.4.0
+name: "@octokit/graphql"
+version: 8.1.2
 type: npm
-summary: Octokit plugin for GitHub's recommended request throttling
+summary: GitHub GraphQL API client for browsers and Node
 homepage:
 license: mit
 licenses:
