@@ -1,5 +1,7 @@
 # licensed-ci
 
+**Please note: This action is deprecated and should no longer be used. The team at GitHub has ceased making and accepting code contributions or maintaining the issue tracker. Please migrate your workflows to the [licensee/licensed-ci](https://github.com/licensee/licensed-ci) action, which is maintained by the community.**
+
 ![test](https://github.com/github/licensed-ci/workflows/Test/badge.svg)
 
 A GitHub Action to run [github/licensed](https://github.com/github/licensed) in a CI workflow.
